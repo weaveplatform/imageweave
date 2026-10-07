@@ -1,60 +1,67 @@
-# weaveplatform-template
+# Imageweave
 
-The starting point for weaveplatform Go repositories: a blocking quality gate
-(lint, unit tests on Linux, macOS and Windows, govulncheck, cross-compile, and a
-≥95% merged coverage gate), release-please through the organisation's App,
-dependencies that track their latest release from the day a repository is born,
-and conventional-commit PR titles.
+Imageweave produces and qualifies VM images for defined execution scenarios using
+Packer templates. It hands portable artifacts to weaveplatform-oci and native
+cloud images to their provider catalogs. Hostweave selects and pins outputs;
+compatible runtimes execute them.
 
-## After creating a repository from this template
+## Release window
 
-1. **Rename the module.** `make init NAME=<repository name>` rewrites
-   `weaveplatform-template` everywhere (module path, this README) and tidies.
-2. **Set the owners** in `.github/CODEOWNERS`.
-3. **Protect `main`.** Require the `Quality gate` and `✅ Validate PR Title` checks,
-   and enable auto-merge so Dependabot updates merge once the gate passes.
-4. **Releases** start at 0.1.0 and need nothing per repository: the organisation's release-please
-   App is installed on all repositories and its credentials are organisation
-   variables and secrets. The workflow warns in its log if it falls back to a
-   `RELEASE_PLEASE_PAT`.
-5. **Replace this README** with the project's own.
+The reviewed baseline is 2026-10-07. N means the latest stable release in each
+selected track, not numeric subtraction.
 
-## Dependencies stay at latest
+| Family | Track | N | N-1 | N-2 |
+|---|---|---|---|---|
+| Windows 11 | Annual general-purpose H2 | 26H2 | 25H2 | 24H2 |
+| Ubuntu | LTS (user-selected) | 26.04 | 24.04 | 22.04 |
+| macOS | Stable major | 27 | 26 | 15 |
+| Fedora | Stable releases | 44 | 43 | 42 |
 
-| Piece | What it moves | When |
-|---|---|---|
-| `deps-refresh.yml` | The `go` directive (latest stable Go), every module and every `go.mod` tool (`go get -u ./... tool`), and `.github/golangci-lint-version` | On the push that creates `main` (repository birth), daily, and on demand |
-| Dependabot | Go modules and GitHub Actions pins, majors included, one grouped PR per ecosystem | Daily |
-| `auto-merge.yml` | Merges either kind of PR once the quality gate has passed on that exact commit | When the gate finishes |
+Every release is represented for amd64 and arm64. Representation is a requested
+support target, not certification: macOS 27 amd64 is unsupported by Apple;
+macOS 26/15 amd64 need a compatible Intel backend. Native Windows and macOS
+ARM64 builders exist; release-wide runtime acceptance is still required.
+Fedora 42 is archived/EOL; it remains in the requested window without a claim
+of upstream maintenance. Fedora 45 beta and hardware-specific Windows 26H1
+do not advance these stable/general-purpose tracks.
 
-The gate is the only thing that holds an update back. A major that breaks the
-build fails it, and the PR stays open for a person. Dependabot owns the action
-pins because changing workflow files needs a permission the org App does not
-have.
+## Current foundation
 
-This repository itself refreshes the same way, so a repository created from it
-starts from a current snapshot and updates again within minutes of creation.
+- An embedded, reviewed release catalog and explicit architecture exceptions.
+- A CLI that lists the matrix and resolves pinned Linux, Windows and macOS build plans.
+- A pinned Packer QEMU template shared by Ubuntu and Fedora on both architectures.
+- A native Packer plugin for Windows HCS installation/Sysprep and Apple IPSW restore.
+- Explicit source checksums, firmware checksums and per-build SSH keys.
+- A build result contract that does not confuse construction with acceptance.
+- Unit tests and a 95% Go coverage gate; Packer validation is a separate check.
 
-## Layout
+Native templates: [Windows](templates/windows/README.md) and
+[macOS](templates/macos/README.md). The [native design record](docs/research/native-packer-builders.md)
+explains library reuse and output compatibility. [Native validation evidence](docs/native-validation-checkpoint.md)
+records the checks and remaining host requirements. Cloud provider templates,
+agent/desktop variants, the complete acceptance contract and automated
+OCI/Hostweave handoff remain integration work.
+Ubuntu 26.04 arm64 has passed a real Packer build followed by OCI pack/unpack
+and two independent clone boots; see the [validation checkpoint](docs/validation-checkpoint.md).
 
-| Path | What |
-|---|---|
-| `cmd/<binary>/` | Entry points: thin cobra shims over `internal/`; excluded from the coverage gate |
-| `internal/` | Project-only packages; `internal/buildinfo` carries the version stamped in by `make build` |
-| `pkg/` | Public, importable packages |
-| `docs/` | Design notes and decision records |
-| `test/acceptance/` | Acceptance tests against real dependencies (excluded from `make test`) |
+## Use
 
-## Make targets
+Run from this repository, with Go 1.27:
 
-| Target | What |
-|---|---|
-| `make gate` | Everything CI runs: vet, lint, test, cover, vuln, build |
-| `make test` | Unit tests with `-race -shuffle=on`, coverage to `cover/unit` |
-| `make cover` | Merges every `cover/*` directory and enforces `.testcoverage.yml` |
-| `make lint` / `make fmt` | golangci-lint with `.golangci.yml` |
-| `make build` | Cross-compiles every `cmd/*` binary for six platforms, CGO disabled |
+    go run ./cmd/imageweave matrix
+    go run ./cmd/imageweave plan --request build.yaml
 
-Acceptance tests write their coverage to another `cover/<name>` directory; the
-coverage job merges whatever it downloads, so adding one is a new CI job that
-uploads a `cover-<name>` artifact plus an entry in the gate's `needs`.
+See [scenarios](docs/scenarios.md) for the matrix, [architecture](docs/architecture.md)
+for ownership, [research](docs/research/release-baseline.md) for primary sources,
+and the [QEMU template](templates/qemu/README.md) for construction.
+[examples/linux.yaml](examples/linux.yaml) describes the required inputs.
+All local image work belongs under /Volumes/KING/weave-images/ for this test setup.
+
+## Quality
+
+    make gate
+    make packer-check
+
+Go statement coverage does not certify template bootability. A candidate remains
+unverified until two independent deployments of its final artifact pass the
+scenario's acceptance contract.

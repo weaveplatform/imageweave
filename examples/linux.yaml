@@ -1,0 +1,20 @@
+# Replace every example value with an authenticated, immutable input.
+schemaVersion: 1
+family: ubuntu
+release: n
+arch: arm64
+purpose: guest-base
+target: qemu
+sourceURL: https://example.invalid/pinned-vendor-build/ubuntu-arm64.img
+sourceSHA256: REPLACE_WITH_AUTHENTICATED_SHA256
+sourceBuild: REPLACE_WITH_VENDOR_BUILD_ID
+workspace: /Volumes/KING/weave-images/imageweave/ubuntu-arm64
+sshPrivateKey: /Volumes/KING/weave-images/imageweave/keys/build
+sshPublicKey: /Volumes/KING/weave-images/imageweave/keys/build.pub
+firmwareCode:
+  path: /Volumes/KING/weave-images/imageweave/firmware/code.fd
+  sha256: REPLACE_WITH_CODE_SHA256
+firmwareVars:
+  path: /Volumes/KING/weave-images/imageweave/firmware/vars.fd
+  sha256: REPLACE_WITH_VARS_SHA256
+accelerator: hvf

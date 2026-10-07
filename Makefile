@@ -45,7 +45,7 @@ test:
 	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit
 	$(GO) test -race -shuffle=on -count=1 -cover -coverpkg=$(MODULE)/... $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit
 
-## cover: merge every cover/* directory and enforce .testcoverage.yml (>=95% total, >=90% per package)
+## cover: merge every cover/* directory and enforce .testcoverage.yml (>=95% total, >=95% per package)
 cover:
 	@dirs=$$(find $(COVER_DIR) -mindepth 1 -maxdepth 1 -type d ! -name '.merged' | paste -sd, -); \
 	if [ -z "$$dirs" ]; then echo "no coverage data; run make test first"; exit 1; fi; \
@@ -76,3 +76,21 @@ build:
 gate: vet lint test cover vuln build
 
 .PHONY: help init fmt lint vet test cover vuln build gate
+
+## packer-check: validate pinned Linux Packer templates across the release matrix
+packer-check:
+	bash scripts/check-packer.sh
+	bash scripts/check-native-packer.sh
+
+.PHONY: packer-check
+
+## native-plugin: build, sign on macOS, and install the native Packer plugin locally
+native-plugin:
+	bash scripts/install-native-plugin.sh
+
+## accept-native: real Packer construction from IMAGEWEAVE_NATIVE_VARS (matching native host)
+accept-native:
+	@test -n "$(IMAGEWEAVE_NATIVE_VARS)" || { echo "Set IMAGEWEAVE_NATIVE_VARS and IMAGEWEAVE_NATIVE_FAMILY"; exit 1; }
+	$(GO) test -count=1 -timeout 3h -v ./test/acceptance
+
+.PHONY: native-plugin accept-native

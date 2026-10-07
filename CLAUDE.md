@@ -5,7 +5,7 @@ These apply to every weaveplatform repository created from this template.
 - **Correctness loop first.** Stand up the quality gate and acceptance tests
   against real dependencies (Docker via testcontainers) before most features
   exist, so every later change lands inside a working test loop.
-- **Coverage gate.** ≥95% total and ≥90% per package, merged across unit tests on
+- **Coverage gate.** ≥95% total and ≥95% per package, merged across unit tests on
   every OS and acceptance runs, enforced by `.testcoverage.yml`. It blocks merges.
 - **Layout.** Public packages in `pkg/`, project-only packages in `internal/`,
   entry points in `cmd/`.

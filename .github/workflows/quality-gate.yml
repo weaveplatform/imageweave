@@ -2,7 +2,7 @@ name: go | Quality gate
 
 # Every pull request passes vet, blocking lint, unit tests on Linux, macOS and
 # Windows, govulncheck, a cross-compile of every cmd/* binary, and the merged
-# coverage gate (>=95% total, >=90% per package). The `gate` job is the
+# coverage gate (>=95% total, >=95% per package). The `gate` job is the
 # single required status check: make it required in branch protection, and
 # add jobs (acceptance against real dependencies in Docker, for example) to
 # its `needs` and to the coverage job as they appear.
@@ -138,7 +138,7 @@ jobs:
         run: make build
 
   coverage:
-    name: 'Coverage gate (≥95% total, ≥90% per package)'
+    name: 'Coverage gate (≥95% total, ≥95% per package)'
     needs: [unit]
     runs-on: ubuntu-latest
     steps:
@@ -166,10 +166,36 @@ jobs:
       - name: Merge and enforce the gate
         run: make cover
 
+
+  packer:
+    name: 'Packer template matrix'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install pinned Packer and validation tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-system-arm qemu-utils xorriso jq
+          curl -fsSL https://releases.hashicorp.com/packer/1.16.0/packer_1.16.0_linux_amd64.zip -o "$RUNNER_TEMP/packer.zip"
+          echo "5edcd14ab59b535040c512dbecd6ec9ef976a000b073c19d93e4c431c948581e  $RUNNER_TEMP/packer.zip" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/imageweave-tools"
+          unzip "$RUNNER_TEMP/packer.zip" packer -d "$RUNNER_TEMP/imageweave-tools"
+          echo "$RUNNER_TEMP/imageweave-tools" >> "$GITHUB_PATH"
+      - name: Validate every implemented release and architecture
+        run: make packer-check
+
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [unit, lint, vuln, build, coverage]
+    needs: [unit, lint, vuln, build, coverage, packer]
     runs-on: ubuntu-latest
     steps:
       - name: Every gate job passed

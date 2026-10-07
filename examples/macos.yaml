@@ -1,0 +1,12 @@
+schemaVersion: 1
+family: macos
+release: n-1
+arch: arm64
+purpose: guest-base
+target: apple-vz
+# Acquire authenticated Apple media first. Native builds accept local media only.
+sourceURL: /Volumes/KING/weave-images/media/restore.ipsw
+sourceSHA256: REPLACE_WITH_AUTHENTICATED_SHA256
+sourceBuild: REPLACE_WITH_APPLE_BUILD
+workspace: /Volumes/KING/weave-images/work/imageweave/macos-build
+timeout: 2h

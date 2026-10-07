@@ -21,3 +21,9 @@ go.work.sum
 .vscode/
 *.swp
 .DS_Store
+
+# Local Packer inputs, caches and candidates
+.packer.d/
+packer_cache/
+*.pkrvars.json
+*.pkrvars.hcl
