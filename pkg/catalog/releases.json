@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-07",
+  "families": [
+    {
+      "id": "windows-11",
+      "track": "annual-h2",
+      "releases": [
+        {
+          "version": "26H2",
+          "slot": "n",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "template",
+              "reason": "Packer native builder; runtime acceptance required"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer native builder; runtime acceptance required"
+            }
+          ]
+        },
+        {
+          "version": "25H2",
+          "slot": "n-1",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "template",
+              "reason": "Packer native builder; runtime acceptance required"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer native builder; runtime acceptance required"
+            }
+          ]
+        },
+        {
+          "version": "24H2",
+          "slot": "n-2",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "template",
+              "reason": "Packer native builder; runtime acceptance required"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer native builder; runtime acceptance required"
+            }
+          ]
+        }
+      ],
+      "source": "https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information"
+    },
+    {
+      "id": "ubuntu",
+      "track": "lts",
+      "releases": [
+        {
+          "version": "26.04",
+          "slot": "n",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            }
+          ]
+        },
+        {
+          "version": "24.04",
+          "slot": "n-1",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            }
+          ]
+        },
+        {
+          "version": "22.04",
+          "slot": "n-2",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            }
+          ]
+        }
+      ],
+      "source": "https://ubuntu.com/project/docs/release-team/list-of-releases/"
+    },
+    {
+      "id": "macos",
+      "track": "stable-major",
+      "releases": [
+        {
+          "version": "27",
+          "slot": "n",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "unsupported",
+              "reason": "macOS 27 requires Apple silicon"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer native builder; runtime acceptance required"
+            }
+          ]
+        },
+        {
+          "version": "26",
+          "slot": "n-1",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "blocked",
+              "reason": "Apple Virtualization.framework macOS guests require Apple silicon; Intel runtime integration unavailable"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer native builder; runtime acceptance required"
+            }
+          ]
+        },
+        {
+          "version": "15",
+          "slot": "n-2",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "blocked",
+              "reason": "Apple Virtualization.framework macOS guests require Apple silicon; Intel runtime integration unavailable"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer native builder; runtime acceptance required"
+            }
+          ]
+        }
+      ],
+      "source": "https://support.apple.com/en-us/127455"
+    },
+    {
+      "id": "fedora",
+      "track": "stable",
+      "releases": [
+        {
+          "version": "44",
+          "slot": "n",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            }
+          ]
+        },
+        {
+          "version": "43",
+          "slot": "n-1",
+          "maintenance": "review-vendor-policy",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            }
+          ]
+        },
+        {
+          "version": "42",
+          "slot": "n-2",
+          "maintenance": "archived",
+          "architectures": [
+            {
+              "arch": "amd64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            },
+            {
+              "arch": "arm64",
+              "status": "template",
+              "reason": "Packer QEMU template; runtime acceptance pending"
+            }
+          ]
+        }
+      ],
+      "source": "https://fedoramagazine.org/announcing-fedora-linux-44/"
+    }
+  ]
+}
