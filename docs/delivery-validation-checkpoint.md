@@ -6,8 +6,8 @@ checking and both CLI/plugin builds for six OS/architecture combinations.
 Coverage was **96.9% (3383/3492)**, with every measured package above 95%.
 Linux was 96.2%, Windows 95.9%, macOS 99.0%, delivery 95.2%, CLI 98.0% and
 shared imagebuild 97.1%. No coverage exclusions or threshold reductions were added.
-Changed workflow files passed actionlint; delivery and workspace scripts passed
-shellcheck. Unit tests do not establish native or cloud execution.
+Changed workflow files passed actionlint; delivery scripts passed shellcheck.
+Unit tests do not establish native or cloud execution.
 
 ## Live Linux qualification
 
@@ -33,7 +33,7 @@ probe actively checks OS family, release and architecture.
 - Index: `sha256:3a2d8ea66113334d7a3069fb1058e53f089865ca7125988dd0f57b4407f15cec`
 - Platform: `sha256:7668cb489e639aa7b9a208eb469b6e35e53d0a5bdf41949a36ee958ae5d4ae91`
 - Report schema: 3, profile: `base`, passed: true.
-- Report: `/Volumes/KING/weave-images/work/imageweave/qualification-20261008-split-linux/acceptance.json`
+- Report: `acceptance.json`, retained in the local qualification workspace; not publicly hosted.
 - Clone serial logs and disk/firmware state are in the same workspace's `reports/` directory.
 
 The first live attempt exposed a systemd ordering cycle: a service ordered after

@@ -15,9 +15,9 @@ Branch: `feat/packer-image-foundation`. Date: 2026-10-07. Validation was perform
 
 ## Live macOS run
 
-A real Packer restore completed successfully under:
-
-    /Volumes/KING/weave-images/work/imageweave/macos-26-arm64-native/
+A real Packer restore completed successfully in a local validation workspace.
+The construction artifacts described below were retained locally and are not
+publicly hosted evidence.
 
 Pinned source: macOS 26.6.2, build 25G83; source SHA256
 `885503b7f4b06609e9a512f2befd40f59730640a3f1233e3892d60affdd51c95`.

@@ -16,8 +16,8 @@ guest-state support. A matrix entry is not evidence that a host passed acceptanc
    it does not claim that changing a product key adds an absent edition.
 2. Pin SHA256 and the exact installed build including update revision.
 3. Set the paths in [examples/windows.yaml](../../examples/windows.yaml) to a
-   mounted image-storage volume on the Windows host. K: is illustrative; it is
-   not an assumed mapping of KING. Keep source and output on the large test disk.
+   mounted image-storage volume on the Windows host. The example drive letter
+   is a placeholder; select storage with enough capacity for source and output.
 4. Build/install the local plugin and resolve the plan:
 
        make native-plugin

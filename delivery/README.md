@@ -45,7 +45,7 @@ imageweave delivery --request request.json \
   --recipe-commit "$(git rev-parse HEAD)" \
   --source-uri https://vendor.example/immutable/image.img \
   --version 26.04-vendorserial-arm64-r1 \
-  --out /Volumes/KING/weave-images/delivery/candidate-1
+  --out /path/to/imageweave/delivery/candidate-1
 ```
 
 The command invokes the pinned Packer template and plugin, imports the manifest

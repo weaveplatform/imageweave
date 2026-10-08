@@ -39,7 +39,7 @@ a lock before building:
 imageweave image lock --out packages-next.json
 imageweave image check-lock --lock packages-next.json --require-packages linux/arm64
 imageweave image prepare-agent --lock packages-next.json --platform linux/arm64 \
-  --cache /Volumes/KING/weave-images/work/cache/packages --out /path/to/new-payload
+  --cache /path/to/imageweave/cache/packages --out /path/to/new-payload
 imageweave image build-linux-agent --base /path/to/verified-layout \
   --base-name ghcr.io/weaveplatform/weave-images/ubuntu-base --arch arm64 \
   --lock packages-next.json --cache /path/to/cache --out /path/to/new-candidate
@@ -99,18 +99,20 @@ preparation and native boot evidence are separate requirements. VMDK export
 alone does not produce an OVA. See the
 [delivery decision](https://github.com/weaveplatform/weaveplatform-oci/blob/main/docs/research/decisions/0015-target-image-delivery.md).
 
-## KING workspace
+## Local workspace
 
-Use `/Volumes/KING/weave-images/` for local media, disks and build outputs.
-`scripts/images/workspace.sh init` mounts the existing APFS sparse bundle on
-KING at `/Volumes/KING/weave-images/work`. Its wrapper checks the backing mount,
-keeps a 32 GiB reserve and routes build caches and temporary files to KING:
+Choose an absolute workspace path on storage with enough capacity for source
+media, sparse disks, cached packages and acceptance outputs. The platform's
+filesystem requirements still apply: macOS restore requires APFS and Windows
+HCS construction requires NTFS/ReFS. Mount and manage that storage outside the
+project; Imageweave does not assume a device name or create a host mount.
+
+For example, build the CLI into an operator-selected directory:
 
 ```sh
-scripts/images/workspace.sh init
-scripts/images/workspace.sh check 80
-scripts/images/workspace.sh run make image-builder \
-  BIN_DIR=/Volumes/KING/weave-images/work/cache
+make image-builder BIN_DIR=/path/to/imageweave/tools
 ```
 
-Choose a fresh candidate directory. Local files are not automatically published.
+Pass fresh candidate paths through `--out` or the build request's `workspace`.
+Set Go and Packer cache environment variables when their default locations are
+unsuitable for the build host. Local files are not automatically published.

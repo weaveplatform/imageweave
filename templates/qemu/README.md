@@ -19,7 +19,7 @@ Packer must refuse an existing candidate directory; do not add -force.
        imageweave plan --request build.yaml > plan.json
        imageweave plan --request build.yaml --vars > build.pkrvars.json
 
-6. Set PACKER_CACHE_DIR under /Volumes/KING/weave-images/, then run:
+6. Set PACKER_CACHE_DIR to a cache directory on the selected build storage, then run:
 
        packer init templates/qemu
        packer validate -var-file=build.pkrvars.json templates/qemu

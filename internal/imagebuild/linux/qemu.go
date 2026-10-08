@@ -227,7 +227,7 @@ func (t Tools) BootLinux(ctx context.Context, o BootOptions) (BootResult, error)
 	}
 	workspaceRoot := ""
 	if o.VerifyReboot {
-		// Acceptance disks follow the selected report volume, including KING.
+		// Acceptance disks follow the selected report volume.
 		workspaceRoot = o.Report
 	}
 	work, err := os.MkdirTemp(workspaceRoot, "weave-boot-")

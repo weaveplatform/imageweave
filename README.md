@@ -61,7 +61,9 @@ See [scenarios](docs/scenarios.md) for the matrix, [architecture](docs/architect
 for ownership, [research](docs/research/release-baseline.md) for primary sources,
 and the [QEMU template](templates/qemu/README.md) for construction.
 [examples/linux.yaml](examples/linux.yaml) describes the required inputs.
-All local image work belongs under /Volumes/KING/weave-images/ for this test setup.
+Choose an absolute workspace path on storage with enough capacity for source
+media, sparse build disks, caches and acceptance outputs. Paths are supplied by
+the build request; the project does not assume a particular disk or mount.
 
 ## Quality
 
