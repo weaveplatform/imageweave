@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 )
 
@@ -30,9 +31,14 @@ func BuildNative(ctx context.Context, o Options, run Runner, log io.Writer) (Con
 	if o.Request.Family != "windows-11" && o.Request.Family != "macos" {
 		return result, fmt.Errorf("%w: native construction requires Windows 11 or macOS", ErrInput)
 	}
-	resolved, vars, err := prepare(o)
+	resolved, vars, err := prepare(ctx, o, log)
 	if err != nil {
 		return result, err
+	}
+	// The native plugin creates only its candidate directory. Packer's QEMU
+	// builder creates its own parents, so Linux tests did not expose this boundary.
+	if err := os.Mkdir(filepath.Join(o.Out, "packer"), 0o700); err != nil {
+		return result, fmt.Errorf("create native Packer workspace: %w", err)
 	}
 	manifest := filepath.Join(o.Out, "packer", "candidate", "packer-manifest.json")
 	bundle, layout := filepath.Join(o.Out, "bundle"), filepath.Join(o.Out, "layout")
@@ -58,6 +64,26 @@ func BuildNative(ctx context.Context, o Options, run Runner, log io.Writer) (Con
 		},
 		{o.OCI, []string{"pack", bundle, "--out", layout, "--tag", o.Version}},
 		{o.OCI, []string{"inspect", layout, "--ref", o.Version, "--deep", "--strict", "--json"}},
+	}
+	if o.Request.Parent != nil {
+		p := o.Request.Parent
+		commands[3].args = []string{
+			"bundle",
+			"import-imageweave",
+			manifest,
+			"--recipe-commit",
+			o.RecipeCommit,
+			"--parent-layout",
+			p.Layout,
+			"--parent-ref",
+			p.Ref,
+			"--parent-name",
+			p.Name,
+			"--version",
+			o.Version,
+			"--out",
+			bundle,
+		}
 	}
 	if err := execute(ctx, commands, run, log); err != nil {
 		return result, err

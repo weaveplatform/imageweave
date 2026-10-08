@@ -9,7 +9,7 @@ runs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         repository: weaveplatform/weaveplatform-oci
-        ref: c6375c7d917bc346a3b66ff7d547fc6c4f6bffc9 # v0.1.3
+        ref: 9aee8641bd6ea21af82c6f3f3f5a4f3aa8d360a8 # macOS prepared contract (PR #50)
         path: .oci-tool
         persist-credentials: false
     - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -82,7 +82,7 @@ runs:
         set -euo pipefail
         test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
         test "$(git -C .oci-tool rev-parse HEAD)" = "$OCI_COMMIT"
-        test "$(go list -m -f '{{.Version}}' github.com/weaveplatform/weaveplatform-oci)" = v0.1.3
+        test "$(go list -m -f '{{.Version}}' github.com/weaveplatform/weaveplatform-oci)" = v0.1.4-0.20261008111851-9aee8641bd6e
         mkdir -p "$WORK/coverage"
         go build -trimpath -cover -covermode=atomic -coverpkg="$(go list -m)/..." \
           -o "$WORK/tools/imageweave" ./cmd/imageweave

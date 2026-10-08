@@ -55,6 +55,13 @@ Run from this repository, with Go 1.27:
     go run ./cmd/imageweave matrix
     go run ./cmd/imageweave plan --request build.yaml
 
+For ad-hoc macOS base and prepared builds, use the standalone Go workflow:
+
+    GOWORK=off go run ./cmd/build-macos --workspace /absolute/path/to/images --release 26 --tier all
+
+See [local macOS builds](docs/local-macos-builds.md) for prerequisites, repeat-run
+behaviour, output contracts and current live-validation limits.
+
 See the [delivery validation checkpoint](docs/delivery-validation-checkpoint.md) for the four-boot Linux evidence.
 
 See [scenarios](docs/scenarios.md) for the matrix, [architecture](docs/architecture.md)

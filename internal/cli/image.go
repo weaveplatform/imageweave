@@ -61,6 +61,7 @@ func newImageWith(
 		}
 		return nil
 	}
+	root.AddCommand(newImageMacOS(macOSBoot(stderr), emit, stderr))
 	root.AddCommand(
 		&cobra.Command{
 			Use:   "matrix",

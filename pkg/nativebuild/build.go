@@ -23,6 +23,7 @@ import (
 	"howett.net/plist"
 
 	"github.com/weaveplatform/imageweave/pkg/catalog"
+	"github.com/weaveplatform/weaveplatform-oci/pkg/spec"
 )
 
 var (
@@ -95,9 +96,17 @@ type FirmwarePolicy struct {
 	TPM           string `json:"tpm"`
 	CloneIdentity string `json:"cloneIdentity"`
 }
+type PreparedResult struct {
+	Parent         spec.BaseImage `json:"parent"`
+	User           string         `json:"user"`
+	AutomaticLogin bool           `json:"automaticLogin"`
+	RemoteLogin    bool           `json:"remoteLogin"`
+}
+
 type Result struct {
-	Firmware  FirmwarePolicy `json:"firmware"`
-	FirstBoot string         `json:"firstBoot"`
+	Prepared  *PreparedResult `json:"prepared,omitempty"`
+	Firmware  FirmwarePolicy  `json:"firmware"`
+	FirstBoot string          `json:"firstBoot"`
 
 	SchemaVersion int                   `json:"schemaVersion"`
 	Config        Config                `json:"inputs"`

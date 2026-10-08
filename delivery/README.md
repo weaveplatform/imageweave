@@ -123,8 +123,10 @@ and current-parent checks. An authenticated candidate alone does not authorize
 Hostweave scheduling. No release-channel root key is needed for this publication
 step, and none is generated.
 
-The Imageweave Go library dependency is OCI v0.1.3. The candidate workflow also
-uses a subsequent OCI CLI commit for publication and `image verify-candidate`; its
+The Imageweave Go library and construction CLI are pinned to OCI commit
+`9aee8641bd6ea21af82c6f3f3f5a4f3aa8d360a8` (the merged prepared-image contract).
+The candidate workflow separately pins the publication CLI for publication and
+`image verify-candidate`; its
 exact source revision is recorded in `tool-commits.txt`. The OCI companion change is merged. The verifier and complete publication
 metadata are not present in v0.1.3. The publication CLI writes the reviewed signer identity and guest OS version directly
 using the shared entry format; the workflow does not rewrite those fields.
@@ -215,8 +217,9 @@ runner with HCS and Git Bash; macOS requires Apple silicon with virtualization
 support and `codesign`. Media acquisition/authentication remains a prerequisite.
 
 Packer 1.16.0 is compiled from pinned source for the host architecture because
-that release does not provide a Windows arm64 archive. OCI tooling remains pinned
-to v0.1.3; the native plugin is built from the checked-out Imageweave commit and
+that release does not provide a Windows arm64 archive. OCI construction tooling
+uses the same prepared-contract commit as the Go module; the native plugin is
+built from the checked-out Imageweave commit and
 signed with the virtualization entitlement on macOS. The workflow retains logs
 and receipts as Actions artifacts; the full image stays on runner storage.
 

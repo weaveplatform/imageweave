@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/imageweave/internal/buildinfo"
 	"github.com/weaveplatform/imageweave/pkg/catalog"
+	"github.com/weaveplatform/imageweave/pkg/macosbuild"
 	"github.com/weaveplatform/imageweave/pkg/plan"
 )
 
@@ -22,6 +23,7 @@ func New(out, errOut io.Writer) *cobra.Command {
 		Version: buildinfo.Version(), Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
+	root.AddCommand(newBuildMacOS(macosbuild.Run))
 	root.SetOut(out)
 	root.SetErr(errOut)
 	root.AddCommand(&cobra.Command{

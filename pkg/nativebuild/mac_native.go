@@ -14,8 +14,11 @@ type MacRestoreRequest struct {
 
 // MacRestoreResult contains only the platform requirements carried by an OCI image.
 type MacRestoreResult struct {
-	HardwareModel                                    string
-	CPUCountMin, CPUCount, MemorySizeMin, MemorySize int64
+	HardwareModel string `json:"HardwareModel"`
+	CPUCountMin   int64  `json:"CPUCountMin"`
+	CPUCount      int64  `json:"CPUCount"`
+	MemorySizeMin int64  `json:"MemorySizeMin"`
+	MemorySize    int64  `json:"MemorySize"`
 }
 
 // MacRestoreFunc is the native Apple restore boundary, injectable for orchestration tests.

@@ -27,3 +27,12 @@ while IFS="$(printf '\t')" read -r family release arch; do
   count=$((count + 1))
 done < "$fixture/native.tsv"
 [ "$count" -eq 9 ] || { echo "Expected nine supported native combinations; got $count"; exit 1; }
+
+# Validate the derived-image builder separately from the nine restore/install rows.
+echo "Validating prepared macOS/arm64"
+"$packer" validate \
+  -var "parent_layout=$fixture/base" -var "parent_ref=validation-only" \
+  -var "parent_name=ghcr.io/weaveplatform/weave-images/macos-26-base" \
+  -var "parent_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000" \
+  -var "source_build=validation-only" -var "output_directory=$fixture/prepared" \
+  -var "timeout=45m" templates/macos/prepared

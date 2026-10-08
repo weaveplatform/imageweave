@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/weaveplatform/imageweave/internal/imagebuild"
 	"github.com/weaveplatform/imageweave/pkg/plan"
 )
 
@@ -65,7 +66,7 @@ func Build(ctx context.Context, o Options, run Runner, log io.Writer) (Result, e
 	if err := validate(o, run); err != nil {
 		return result, err
 	}
-	resolved, vars, err := prepare(o)
+	resolved, vars, err := prepare(ctx, o, log)
 	if err != nil {
 		return result, err
 	}
@@ -134,13 +135,15 @@ func validate(o Options, run Runner) error {
 
 func validateCommon(o Options, run Runner) error {
 	u, err := url.Parse(o.SourceURI)
+	prepared := o.Request.Purpose == "guest-prepared" && o.Request.Parent != nil &&
+		o.SourceURI == ""
 	if !commitPattern.MatchString(o.RecipeCommit) || !versionPattern.MatchString(o.Version) ||
-		err != nil ||
-		u.Scheme != "https" ||
-		u.Host == "" ||
-		u.User != nil ||
-		u.RawQuery != "" ||
-		u.Fragment != "" {
+		(!prepared && (err != nil ||
+			u.Scheme != "https" ||
+			u.Host == "" ||
+			u.User != nil ||
+			u.RawQuery != "" ||
+			u.Fragment != "")) {
 		return fmt.Errorf(
 			"%w: commit SHA, immutable version and credential-free HTTPS source URI required",
 			ErrInput,
@@ -154,9 +157,13 @@ func validateCommon(o Options, run Runner) error {
 }
 
 // prepare is shared construction plumbing; qualification is selected by the caller.
-func prepare(o Options) (plan.Plan, string, error) {
+func prepare(ctx context.Context, o Options, log io.Writer) (plan.Plan, string, error) {
 	o.Request.Workspace = filepath.Join(o.Out, "packer")
+	progress := imagebuild.NewNativeProgress(ctx, log, "delivery input verification")
+	finish := progress.Start()
+	progress.Step("checking pinned source and firmware hashes")
 	resolved, err := plan.Resolve(o.Request)
+	finish(err)
 	if err != nil {
 		return plan.Plan{}, "", fmt.Errorf("resolve delivery plan: %w", err)
 	}

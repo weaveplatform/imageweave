@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/imageweave/pkg/catalog"
+	"github.com/weaveplatform/imageweave/pkg/plan"
 )
 
 func nativeOptions(t *testing.T) Options {
@@ -54,6 +55,16 @@ func TestNativeConstructionMatrix(t *testing.T) {
 				func(_ context.Context, binary string, args []string, output io.Writer) error {
 					if output != &log {
 						t.Fatal("diagnostics writer lost")
+					}
+					if binary == o.Packer && args[0] == "build" {
+						// Match the real native plugin: it creates the leaf only and
+						// refuses reuse. The delivery layer must supply its parent.
+						if err := os.Mkdir(
+							filepath.Join(o.Out, "packer", "candidate"),
+							0o700,
+						); err != nil {
+							return err
+						}
 					}
 					calls = append(calls, append([]string{binary}, args...))
 					return nil
@@ -124,7 +135,8 @@ func TestNativeConstructionMatrix(t *testing.T) {
 				variables["release"] != selection.Version {
 				t.Fatal(variables)
 			}
-			if !strings.Contains(log.String(), "weaveoci inspect started") {
+			if !strings.Contains(log.String(), "weaveoci inspect started") ||
+				!strings.Contains(log.String(), "checking pinned source and firmware hashes") {
 				t.Fatal(log.String())
 			}
 		})
@@ -173,5 +185,56 @@ func TestNativeConstructionFailures(t *testing.T) {
 		); err == nil {
 			t.Fatal("invalid native input accepted")
 		}
+	}
+}
+
+func TestPreparedDeliveryBindsParent(t *testing.T) {
+	o := nativeOptions(t)
+	o.Request.Arch = "arm64"
+	o.Request.Purpose = "guest-prepared"
+	o.SourceURI = ""
+	o.Request.SourceURL = ""
+	o.Request.SourceSHA256 = ""
+	o.Request.Parent = &plan.Parent{
+		Layout: filepath.Join(t.TempDir(), "base"),
+		Ref:    "base-r1",
+		Name:   "ghcr.io/example/macos-base",
+		Digest: "sha256:" + strings.Repeat("a", 64),
+	}
+	seen := false
+	r, err := BuildNative(
+		t.Context(),
+		o,
+		func(_ context.Context, _ string, args []string, _ io.Writer) error {
+			if args[0] != "bundle" {
+				return nil
+			}
+			seen = true
+			want := []string{
+				"bundle",
+				"import-imageweave",
+				filepath.Join(o.Out, "packer", "candidate", "packer-manifest.json"),
+				"--recipe-commit",
+				o.RecipeCommit,
+				"--parent-layout",
+				o.Request.Parent.Layout,
+				"--parent-ref",
+				"base-r1",
+				"--parent-name",
+				"ghcr.io/example/macos-base",
+				"--version",
+				o.Version,
+				"--out",
+				filepath.Join(o.Out, "bundle"),
+			}
+			if !reflect.DeepEqual(args, want) {
+				t.Fatal(args)
+			}
+			return nil
+		},
+		nil,
+	)
+	if err != nil || !seen || r.Qualification != "unverified" {
+		t.Fatal(r, err)
 	}
 }
