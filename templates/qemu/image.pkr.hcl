@@ -51,21 +51,23 @@ variable "accelerator" {
 }
 
 source "qemu" "guest" {
-  iso_url              = var.source_url
-  iso_checksum         = "sha256:${var.source_sha256}"
-  disk_image           = true
-  format               = "raw"
-  disk_size            = "24G"
-  disk_interface       = "virtio"
-  net_device           = "virtio-net"
-  cdrom_interface      = "virtio-scsi"
-  qemu_binary          = var.arch == "arm64" ? "qemu-system-aarch64" : "qemu-system-x86_64"
-  machine_type         = var.arch == "arm64" ? "virt" : "q35"
-  cpu_model            = var.accelerator == "tcg" ? "max" : "host"
-  accelerator          = var.accelerator
-  cpus                 = 2
-  memory               = 4096
-  headless             = true
+  iso_url         = var.source_url
+  iso_checksum    = "sha256:${var.source_sha256}"
+  disk_image      = true
+  format          = "raw"
+  disk_size       = "24G"
+  disk_interface  = "virtio"
+  net_device      = "virtio-net"
+  cdrom_interface = "virtio-scsi"
+  qemu_binary     = var.arch == "arm64" ? "qemu-system-aarch64" : "qemu-system-x86_64"
+  machine_type    = var.arch == "arm64" ? "virt" : "q35"
+  cpu_model       = var.accelerator == "tcg" ? "max" : "host"
+  accelerator     = var.accelerator
+  cpus            = 2
+  memory          = 4096
+  headless        = true
+  # Preserve guest boot diagnostics outside the disk payload, including failed builds.
+  qemuargs             = [["-serial", "file:${var.workspace}/serial.log"]]
   efi_boot             = true
   efi_firmware_code    = var.efi_firmware_code
   efi_firmware_vars    = var.efi_firmware_vars
