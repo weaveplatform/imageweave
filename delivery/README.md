@@ -33,9 +33,11 @@ archived; its inclusion does not assert current vendor maintenance. Source
 checksum authentication is complete; it does not substitute for each image's
 runtime acceptance.
 
-Pull requests affecting this path and the weekly schedule execute the default
-Ubuntu N arm64 build and acceptance without publication. Workflow dispatch can
-select any or all of the twelve reviewed Linux rows.
+Every pull request runs Ubuntu N arm64 construction and acceptance through the
+required quality gate's read-only reusable workflow. The standalone candidate
+workflow also runs weekly; dispatch can select any or all of the twelve reviewed
+Linux rows. Both workflows share the same Packer/OCI build action. Publication
+is disabled in the quality gate and by default in standalone runs.
 For local builds, supply a strict `plan.Request` YAML/JSON with authenticated
 source/firmware hashes, existing ephemeral SSH key paths, and an absolute output
 parent. Run from the checked-out recipe repository:

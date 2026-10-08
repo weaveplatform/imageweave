@@ -72,7 +72,7 @@ build:
 		done; \
 	done
 
-## gate: everything CI runs, in order
+## gate: local Go quality checks (CI also requires Packer validation and live Linux acceptance)
 gate: vet lint test cover vuln build
 
 .PHONY: help init fmt lint vet test cover vuln build gate
