@@ -167,20 +167,20 @@ jobs:
           persist-credentials: false
       - name: Build and accept candidate with coverage
         uses: ./.github/actions/linux-candidate
-      - name: Check out candidate verifier
+      - name: Check out publication tools
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: weaveplatform/weaveplatform-oci
-          ref: 3e13bcaba7de8faacbdbed42704d7e0b4e8c13ac
-          path: .oci-candidate-verifier
+          ref: 27ab4bdcb09c738f017c85e2d16ea8e007849299
+          path: .oci-delivery
           persist-credentials: false
-      - name: Compile candidate verifier from its reviewed commit
+      - name: Build publication tools
         run: |
           set -euo pipefail
-          verifier_commit=3e13bcaba7de8faacbdbed42704d7e0b4e8c13ac
-          test "$(git -C .oci-candidate-verifier rev-parse HEAD)" = "$verifier_commit"
-          (cd .oci-candidate-verifier && go build -trimpath -o "$WORK/tools/weaveoci-candidate" ./cmd/weaveoci)
-          printf 'candidate-verifier=%s\n' "$verifier_commit" >> "$WORK/tool-commits.txt"
+          delivery_commit=27ab4bdcb09c738f017c85e2d16ea8e007849299
+          test "$(git -C .oci-delivery rev-parse HEAD)" = "$delivery_commit"
+          (cd .oci-delivery && go build -trimpath -o "$WORK/tools/weaveoci-delivery" ./cmd/weaveoci)
+          printf 'publication-tools=%s\n' "$delivery_commit" >> "$WORK/tool-commits.txt"
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -204,16 +204,9 @@ jobs:
           tag=$(jq -er .tag "$WORK/metadata.json")
           repository=$(jq -er .repository "$WORK/metadata.json")
           digest=$(jq -er .indexDigest "$WORK/delivery/validated/acceptance.json")
-          weaveoci publish --layout "$WORK/delivery/validated/layout" --layout-ref "$tag" \
+          weaveoci-delivery publish --layout "$WORK/delivery/validated/layout" --layout-ref "$tag" \
             --expected-digest "$digest" --acceptance "$WORK/delivery/validated/acceptance.json" \
             --repository "$repository" --tag "$tag" --promotion-out "$WORK/promotion.json"
-          # publish's generic GitHub provider leaves identity claims unset.
-          # Bind the dispatch claims to reviewed policy; verify-candidate later
-          # authenticates registry statements against that same policy.
-          jq --slurpfile p delivery/candidate-policy.json \
-            '.signature.issuer=$p[0].build.issuer | .signature.subjectRegexp=$p[0].build.subjectRegexp' \
-            "$WORK/promotion.json" > "$WORK/promotion-bound.json"
-          mv "$WORK/promotion-bound.json" "$WORK/promotion.json"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "name=ghcr.io/weaveplatform/weave-images/$repository" >> "$GITHUB_OUTPUT"
       - name: Sign build provenance for the published index
@@ -235,7 +228,7 @@ jobs:
       - name: Authenticate registry result with a fresh local audit layout
         run: |
           set -euo pipefail
-          weaveoci-candidate image verify-candidate "$WORK/promotion.json" \
+          weaveoci-delivery image verify-candidate "$WORK/promotion.json" \
             --policy delivery/candidate-policy.json --out "$WORK/published-audit" > "$WORK/candidate-verification.json"
           # A successful candidate does not dispatch or alter a release channel.
       - name: Delete ephemeral build SSH credentials
