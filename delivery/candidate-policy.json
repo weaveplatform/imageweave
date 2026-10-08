@@ -1,0 +1,12 @@
+{
+  "registry": "ghcr.io",
+  "trustedRoot": "trust/sigstore-public-good.json",
+  "build": {
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subjectRegexp": "^https://github\\.com/weaveplatform/imageweave/\\.github/workflows/linux-candidate\\.yml@refs/heads/main$"
+  },
+  "acceptance": {
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subjectRegexp": "^https://github\\.com/weaveplatform/imageweave/\\.github/workflows/linux-candidate\\.yml@refs/heads/main$"
+  }
+}
