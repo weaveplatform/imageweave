@@ -125,8 +125,7 @@ step, and none is generated.
 
 The Imageweave Go library dependency is OCI v0.1.3. The candidate workflow also
 uses a subsequent OCI CLI commit for publication and `image verify-candidate`; its
-exact source revision is recorded in `tool-commits.txt`. Merge the OCI companion
-change before enabling publication. The verifier and complete publication
+exact source revision is recorded in `tool-commits.txt`. The OCI companion change is merged. The verifier and complete publication
 metadata are not present in v0.1.3. The publication CLI writes the reviewed signer identity and guest OS version directly
 using the shared entry format; the workflow does not rewrite those fields.
 
@@ -161,6 +160,75 @@ schema-3 acceptance report passed. The original Actions run remains failed.
 - Index: `sha256:ee20b6cf06f297ad8ee51086a615ecc6fcf5217f1d57dd31a94a0c032a64a3ae`
 - Platform: `sha256:0545c696ebac8e7c4e8f86f792bee1b0bd176bf6bc6725bde68688ec1e1a237d`
 
-After merging the metadata fix, use revision `2` for the next publication run;
-revision `1` already exists and must not be overwritten. No release channel has
+Revision `2` completed after the metadata fix (see below); neither existing
+revision may be overwritten. No release channel has
 been promoted, and Hostweave runtime consumption has not yet been demonstrated.
+
+## Successful signed candidate: revision 2
+
+[Run 37756233330](https://github.com/weaveplatform/imageweave/actions/runs/37756233330)
+completed successfully on 2026-10-08. It rebuilt Ubuntu 26.04 amd64 from serial
+`20260927`, passed independent-clone/reboot acceptance, published the accepted
+layout, signed build and acceptance statements, then fetched and authenticated
+both statements and the schema-3 report from GHCR.
+
+- Tag: `26.04-20260927-amd64-r2`
+- Index: `sha256:b46a3ebab827c106228a5e9d6c6d606d646057931f5ae2583727f85cb4418a61`
+- Platform: `sha256:63621674698f56229aabfcc424b8af3588374dc7bf36550ba07c93a07d7e82e7`
+- Both signers: the reviewed main-branch `linux-candidate.yml` workflow.
+
+This qualifies that exact candidate, not every Linux release or a release channel.
+The broader [twelve-row qualification run](https://github.com/weaveplatform/imageweave/actions/runs/37757271019)
+was started separately with publication disabled. Its results must be checked
+individually; scheduling the matrix is not proof that all rows passed.
+
+## Native construction delivery
+
+`imageweave delivery-native` connects the existing Windows HCS and macOS Apple VZ
+Packer templates to OCI import, packing and deep integrity checking. Install the
+native plugin from the reviewed recipe checkout first. Requests use the strict
+[Windows](../examples/windows.yaml) or [macOS](../examples/macos.yaml) format,
+with authenticated local media and its pinned hash/build. The command selects a
+fresh Packer workspace under `--out` and refuses an existing output directory.
+
+```sh
+imageweave delivery-native --request native-request.yaml \
+  --recipe-commit "$(git rev-parse HEAD)" \
+  --source-uri https://vendor.example/immutable/media \
+  --version native-build-arm64-r1 --out /path/to/image-storage/native-delivery
+```
+
+The result identifies the manifest, imported bundle and OCI layout and always
+reports `qualification: unverified`. It does not run Linux acceptance, fabricate
+native observations, sign or publish. OCI imports only manifest-listed files:
+Windows exports raw sectors and a firmware policy; macOS retains its hardware
+model and auxiliary storage. VM identities and private working containers stay
+outside the published file contract.
+
+The manual `Native image construction` workflow replaces the transitional
+Windows-only installation workflow. It accepts an existing runner-local request,
+its canonical source URI and an immutable candidate tag. It runs only from `main`
+and requires a matching self-hosted runner with `weave-images` plus the platform
+labels (`Windows`/`X64`, `Windows`/`ARM64`, or `macOS`/`ARM64`). Configure
+`WEAVE_IMAGE_WORKSPACE` to existing image storage. Windows requires an elevated
+runner with HCS and Git Bash; macOS requires Apple silicon with virtualization
+support and `codesign`. Media acquisition/authentication remains a prerequisite.
+
+Packer 1.16.0 is compiled from pinned source for the host architecture because
+that release does not provide a Windows arm64 archive. OCI tooling remains pinned
+to v0.1.3; the native plugin is built from the checked-out Imageweave commit and
+signed with the virtualization entitlement on macOS. The workflow retains logs
+and receipts as Actions artifacts; the full image stays on runner storage.
+
+`TestNativeDelivery` is a real opt-in integration test. Set
+`IMAGEWEAVE_NATIVE_REQUEST`, `IMAGEWEAVE_NATIVE_SOURCE_URI` and a new absolute
+`IMAGEWEAVE_NATIVE_OUT`, install the plugin, and run:
+
+```sh
+go test -count=1 -timeout 4h -run '^TestNativeDelivery$' -v ./test/acceptance
+```
+
+A default skip is not acceptance. Matching Windows host execution remains
+[deferred under OCI #38](https://github.com/weaveplatform/weaveplatform-oci/issues/38).
+Native clone onboarding, independent identities and reboot observations must
+still be implemented and exercised before native candidate publication.

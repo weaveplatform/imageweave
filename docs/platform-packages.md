@@ -24,7 +24,9 @@ pretending to boot an operating system. Platform tests live beside their code.
 Moving a scenario into its owner's package does not replace its construction
 engine. Migrated Windows fallback and agent/desktop commands preserve their
 behavior while Packer scenario adapters replace them incrementally. Base-image
-candidate delivery uses the pinned Packer templates.
+candidate delivery uses the pinned Packer templates. `delivery-native` imports
+and deeply checks native construction output without granting runtime qualification;
+the native workflow now uses this path for both Windows and macOS.
 
 ## Disk formats and host backends
 

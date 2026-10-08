@@ -1,27 +1,27 @@
-name: images | Native candidate
+name: Native image construction
 
-# Transitional Windows path: retained until Imageweave native acceptance passes.
-# macOS base construction has moved to Imageweave/Packer.
+# Construction and OCI integrity only. Native clone/reboot qualification is
+# required before this workflow may gain publication or signing permissions.
 on:
   workflow_dispatch:
     inputs:
       platform:
-        description: Native build host
+        description: Matching native build host
         type: choice
-        options: [windows-amd64, windows-arm64]
+        options: [windows-amd64, windows-arm64, macos-arm64]
+        required: true
+      request:
+        description: Absolute runner-local path to a reviewed pinned build request
+        type: string
+        required: true
+      source_uri:
+        description: Canonical credential-free vendor media HTTPS URI
+        type: string
         required: true
       version:
-        description: Windows edition-release (pro-26h2)
+        description: Immutable candidate tag including release, build, architecture and revision
         type: string
         required: true
-      language:
-        description: Windows media language
-        type: string
-        default: en-US
-      revision:
-        description: Positive candidate revision
-        type: string
-        default: '1'
 
 permissions:
   contents: read
@@ -32,44 +32,107 @@ concurrency:
 
 env:
   GOWORK: 'off'
-  IMAGE_VERSION: ${{ inputs.version }}
-  IMAGE_LANGUAGE: ${{ inputs.language }}
-  IMAGE_REVISION: ${{ inputs.revision }}
+  OCI_COMMIT: c6375c7d917bc346a3b66ff7d547fc6c4f6bffc9 # v0.1.3
+  PACKER_COMMIT: 856572ec8313eab942dce5bca8e623ce2171d7cb # v1.16.0
 
 jobs:
-  windows:
-    if: startsWith(inputs.platform, 'windows-')
-    runs-on: ${{ fromJSON(inputs.platform == 'windows-arm64' && '["self-hosted","Windows","ARM64","weave-images"]' || '["self-hosted","Windows","X64","weave-images"]') }}
-    timeout-minutes: 180
+  construct:
+    name: Construct native candidate (${{ inputs.platform }})
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ fromJSON(inputs.platform == 'macos-arm64' && '["self-hosted","macOS","ARM64","weave-images"]' || inputs.platform == 'windows-arm64' && '["self-hosted","Windows","ARM64","weave-images"]' || '["self-hosted","Windows","X64","weave-images"]') }}
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
     env:
-      IMAGE_ARCH: ${{ inputs.platform == 'windows-arm64' && 'arm64' || 'amd64' }}
+      REQUEST: ${{ inputs.request }}
+      SOURCE_URI: ${{ inputs.source_uri }}
+      IMAGE_VERSION: ${{ inputs.version }}
+      NATIVE_PLATFORM: ${{ inputs.platform }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out recipes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Check out OCI tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: weaveplatform/weaveplatform-oci
+          ref: c6375c7d917bc346a3b66ff7d547fc6c4f6bffc9 # v0.1.3
+          path: .oci-tool
+          persist-credentials: false
+      - name: Check out Packer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: hashicorp/packer
+          ref: 856572ec8313eab942dce5bca8e623ce2171d7cb # v1.16.0
+          path: .packer-tool
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: false
-      - name: Build and install candidate through HCS
-        shell: pwsh
+      - name: Prepare native workspace
         run: |
-          $ErrorActionPreference = 'Stop'
-          Write-Output "[$([DateTime]::UtcNow.ToString('o'))] Preparing native Windows builder for $env:IMAGE_ARCH"
-          if (!$env:WEAVE_IMAGE_WORKSPACE -or !(Test-Path $env:WEAVE_IMAGE_WORKSPACE)) {
-            throw 'Set WEAVE_IMAGE_WORKSPACE on the runner to its NTFS/ReFS image storage directory.'
+          set -euo pipefail
+          test -n "${WEAVE_IMAGE_WORKSPACE:-}" && test -d "$WEAVE_IMAGE_WORKSPACE" || {
+            echo 'Set WEAVE_IMAGE_WORKSPACE to existing image storage on this runner' >&2
+            exit 1
           }
-          $work = $env:WEAVE_IMAGE_WORKSPACE
-          $env:GOCACHE = Join-Path $work 'cache/go-build'
-          $env:GOMODCACHE = Join-Path $work 'cache/go-mod'
-          $env:TEMP = Join-Path $work 'tmp'
-          $env:TMP = $env:TEMP
-          New-Item -ItemType Directory -Force $env:GOCACHE,$env:GOMODCACHE,$env:TEMP | Out-Null
-          $binary = Join-Path $work 'cache/imageweave.exe'
-          go build -o $binary ./cmd/imageweave 2>&1
-          if ($LASTEXITCODE -ne 0) { throw 'Builder compilation failed' }
-          $out = Join-Path $work "builds/native-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
-          & $binary image build-windows --from-windows $env:IMAGE_VERSION --arch $env:IMAGE_ARCH `
-            --language $env:IMAGE_LANGUAGE --revision $env:IMAGE_REVISION `
-            --cache (Join-Path $work 'media/windows') --out $out 2>&1
-          if ($LASTEXITCODE -ne 0) { throw 'Native Windows installation failed' }
+          test -f "$REQUEST"
+          host="$(go env GOOS)-$(go env GOARCH)"
+          expected="$NATIVE_PLATFORM"
+          if [ "$expected" = macos-arm64 ]; then expected=darwin-arm64; fi
+          test "$host" = "$expected" || { echo "Expected $expected; found $host" >&2; exit 1; }
+          parent="$WEAVE_IMAGE_WORKSPACE"
+          if [ "$(go env GOOS)" = windows ]; then parent=$(cygpath -am "$parent"); fi
+          WORK="$parent/native-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir "$WORK"
+          mkdir "$WORK/tools" "$WORK/tmp" "$WORK/plugins"
+          {
+            echo "WORK=$WORK"
+            echo "GOTMPDIR=$WORK/tmp"
+            echo "PACKER_PLUGIN_PATH=$WORK/plugins"
+          } >> "$GITHUB_ENV"
+          echo "$WORK/tools" >> "$GITHUB_PATH"
+      - name: Build pinned native tools
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C .oci-tool rev-parse HEAD)" = "$OCI_COMMIT"
+          test "$(git -C .packer-tool rev-parse HEAD)" = "$PACKER_COMMIT"
+          ext=
+          if [ "$(go env GOOS)" = windows ]; then ext=.exe; fi
+          go build -trimpath -o "$WORK/tools/imageweave$ext" ./cmd/imageweave
+          (cd .oci-tool && go build -trimpath -o "$WORK/tools/weaveoci$ext" ./cmd/weaveoci)
+          # Packer has no official Windows arm64 archive. Compile the reviewed
+          # source for the actual host so it discovers the matching native plugin.
+          (cd .packer-tool && go build -trimpath -o "$WORK/tools/packer$ext" .)
+          PACKER="$WORK/tools/packer$ext" bash scripts/install-native-plugin.sh
+          {
+            printf 'imageweave=%s\nweaveplatform-oci=%s\npacker=%s\n' "$GITHUB_SHA" "$OCI_COMMIT" "$PACKER_COMMIT"
+            go version
+            "$WORK/tools/packer$ext" version
+          } > "$WORK/tool-commits.txt"
+      - name: Construct and package native image
+        run: |
+          set -euo pipefail
+          # Do not enable Packer debug logs or upload the runner's request/media.
+          imageweave delivery-native --request "$REQUEST" --recipe-commit "$GITHUB_SHA" \
+            --source-uri "$SOURCE_URI" --version "$IMAGE_VERSION" --out "$WORK/delivery" \
+            > "$WORK/construction.json" 2> >(tee "$WORK/construction.log" >&2)
+          cat "$WORK/construction.json"
+      - name: Preserve construction diagnostics
+        if: always() && env.WORK != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-construction-${{ inputs.platform }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ env.WORK }}/tool-commits.txt
+            ${{ env.WORK }}/construction.json
+            ${{ env.WORK }}/construction.log
+            ${{ env.WORK }}/delivery/packer/candidate/packer-manifest.json
+            ${{ env.WORK }}/delivery/bundle/imageweave-import.json
