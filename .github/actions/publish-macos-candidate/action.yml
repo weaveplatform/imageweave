@@ -17,7 +17,8 @@ runs:
         acceptance=$(jq -er .acceptance <<< "$result")
         repository="macos-$RELEASE-$TIER"
         jq -e --arg digest "$digest" --arg tag "$tag" '.schemaVersion == 3 and .passed == true and .indexDigest == $digest and .tag == $tag' "$acceptance" >/dev/null
-        weaveoci publish --layout "$layout" --layout-ref "$tag" --expected-digest "$digest" \
+        # Only OCI publication needs large temporary registry read-back data.
+        TMPDIR="$WORK/tmp" weaveoci publish --layout "$layout" --layout-ref "$tag" --expected-digest "$digest" \
           --acceptance "$acceptance" --repository "$repository" --tag "$tag" \
           --promotion-out "$WORK/$TIER-promotion.json"
         {
@@ -47,6 +48,6 @@ runs:
         TIER: base
       run: |
         set -euo pipefail
-        weaveoci image verify-candidate "$WORK/$TIER-promotion.json" \
+        TMPDIR="$WORK/tmp" weaveoci image verify-candidate "$WORK/$TIER-promotion.json" \
           --policy delivery/macos-candidate-policy.json --out "$WORK/$TIER-published-audit" \
           > "$WORK/$TIER-verification.json"

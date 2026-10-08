@@ -22,9 +22,13 @@ runs:
         command -v codesign
         WORK=$(mktemp -d "$WEAVE_IMAGE_WORKSPACE/macos-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RELEASE.XXXXXX")
         mkdir "$WORK/bootstrap" "$WORK/tmp" "$WORK/docker"
+        # Go linker output and Packer Unix sockets require host-local storage.
+        # Image files remain in WORK; publication scopes its own OCI scratch.
+        mkdir -p "$RUNNER_TEMP/go-build"
         {
           echo "WORK=$WORK"
-          echo "TMPDIR=$WORK/tmp"
+          echo "TMPDIR=$RUNNER_TEMP"
+          echo "GOTMPDIR=$RUNNER_TEMP/go-build"
           echo "DOCKER_CONFIG=$WORK/docker"
         } >> "$GITHUB_ENV"
         echo "$WORK/tools" >> "$GITHUB_PATH"
