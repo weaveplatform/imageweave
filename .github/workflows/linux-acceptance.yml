@@ -27,7 +27,7 @@ jobs:
         env:
           FAMILY: ubuntu
           RELEASE: n
-          ARCH: arm64
+          ARCH: amd64
         run: |
           set -euo pipefail
           matrix=$(jq -c --arg family "$FAMILY" --arg release "$RELEASE" --arg arch "$ARCH" \
@@ -48,6 +48,7 @@ jobs:
       ARCH: ${{ matrix.arch }}
       SOURCE_SERIAL: ''
       CANDIDATE_REVISION: '1'
+      REQUIRED_ACCELERATOR: kvm
     steps:
       - uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
         with:
@@ -79,6 +80,7 @@ jobs:
           path: |
             ${{ env.WORK }}/tool-commits.txt
             ${{ env.WORK }}/build-tools.txt
+            ${{ env.WORK }}/kvm-probe.log
             ${{ env.WORK }}/qemu-commands.log
             ${{ env.WORK }}/source.json
             ${{ env.WORK }}/request.json

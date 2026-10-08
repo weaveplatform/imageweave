@@ -33,11 +33,30 @@ archived; its inclusion does not assert current vendor maintenance. Source
 checksum authentication is complete; it does not substitute for each image's
 runtime acceptance.
 
-Every pull request runs Ubuntu N arm64 construction and acceptance through the
-required quality gate's read-only reusable workflow. The standalone candidate
-workflow also runs weekly; dispatch can select any or all of the twelve reviewed
-Linux rows. Both workflows share the same Packer/OCI build action. Publication
-is disabled in the quality gate and by default in standalone runs.
+Every pull request runs Ubuntu N amd64 construction and acceptance through the
+required quality gate's read-only reusable workflow. That gate verifies a paused
+QEMU machine can initialize KVM before downloading source media, then requires the
+resolved build request to select KVM. Missing or unusable KVM fails the gate;
+there is no TCG fallback. The Packer build, OCI import, exact-artifact two-clone
+reboot assertions and 95% total/per-package coverage thresholds are unchanged.
+
+This hardware choice follows the 2026-10-08 investigation: the hosted Ubuntu
+26.04 arm64 candidate timed out waiting for SSH after 20 minutes under TCG.
+A local reproduction using the same source bytes, Ubuntu 24.04 AAVMF firmware,
+QEMU 8.2 and the pinned Packer plugin completed the build under TCG in 11 minutes
+35 seconds, with guest uptime around 489 seconds when SSH became available. This
+shows the template can complete under TCG, but does not establish the hosted
+failure's root cause or qualify that runner.
+Hosted ARM/TCG remains unqualified pending its diagnostic run. The workflows now
+stream and retain guest serial output, QEMU argument vectors and tool versions.
+GitHub does not guarantee nested virtualization, so the gate verifies KVM rather
+than inferring it from a runner label. See the [GitHub runner documentation](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners#cloud-hosts-used-by-github-hosted-runners).
+
+The standalone candidate workflow retains its Ubuntu N arm64 default and weekly
+run; dispatch can select any or all of the twelve reviewed Linux rows. Both
+workflows share the same Packer/OCI build action. Publication is disabled in the
+quality gate and by default in standalone runs. An unsuccessful ARM run cannot
+publish a qualified candidate.
 For local builds, supply a strict `plan.Request` YAML/JSON with authenticated
 source/firmware hashes, existing ephemeral SSH key paths, and an absolute output
 parent. Run from the checked-out recipe repository:
