@@ -212,7 +212,7 @@ func newImageValidate(tools linuxValidator, emit func(any) error) *cobra.Command
 	cmd.Flags().StringVar(&o.Out, "out", "", "New candidate directory")
 	cmd.Flags().
 		StringSliceVar(&o.Arches, "arches", []string{"amd64", "arm64"}, "Required architectures (comma separated)")
-	cmd.Flags().IntVar(&timeout, "timeout", 1200, "Boot timeout per clone in seconds")
+	cmd.Flags().IntVar(&timeout, "timeout", 1200, "Timeout for each initial boot and reboot in seconds")
 	return cmd
 }
 

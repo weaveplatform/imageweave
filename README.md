@@ -55,6 +55,8 @@ Run from this repository, with Go 1.27:
     go run ./cmd/imageweave matrix
     go run ./cmd/imageweave plan --request build.yaml
 
+See the [delivery validation checkpoint](docs/delivery-validation-checkpoint.md) for the four-boot Linux evidence.
+
 See [scenarios](docs/scenarios.md) for the matrix, [architecture](docs/architecture.md)
 for ownership, [research](docs/research/release-baseline.md) for primary sources,
 and the [QEMU template](templates/qemu/README.md) for construction.
