@@ -8,7 +8,7 @@ permissions:
 
 env:
   GOWORK: 'off'
-  OCI_COMMIT: 5f8bebbcdf6f3e6534b8ccf79e592512791bc01c
+  OCI_COMMIT: c6375c7d917bc346a3b66ff7d547fc6c4f6bffc9
 
 jobs:
   select:

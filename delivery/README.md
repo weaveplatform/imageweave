@@ -94,21 +94,39 @@ their ephemeral SSH keys; the workflow always removes its generated keys.
 ## Publication boundary
 
 Publication is disabled by default and requires the workflow on reviewed `main`,
-the `image-candidates` environment, and a reviewed
-`delivery/admission-policy.json`. Configure required environment reviewers in
-GitHub before enabling this path. No trust keys or channels are generated.
-The policy follows OCI's admission schema: GHCR registry, relative local Sigstore
-trusted-root file, anchored build and acceptance workflow identity expressions,
-signed channel location and named public root anchors. Pin the workflow identity
-to `linux-candidate.yml@refs/heads/main`; use the GitHub Actions OIDC issuer.
+the `image-candidates` environment with required reviewers, and the checked-in
+`delivery/candidate-policy.json`. The preflight fails if the environment is absent
+or unprotected. Build-only runs use a separate read-only job; package and signing permissions
+belong only to the main-only publication job. Repository administrators choose
+the reviewers; no environment or
+signing-key hierarchy is created by the workflow.
+
+The candidate policy trusts only the GitHub Actions OIDC issuer and
+`https://github.com/weaveplatform/imageweave/.github/workflows/linux-candidate.yml@refs/heads/main`.
+Its public Sigstore root is reviewed repository content; see
+[trust acquisition and refresh](trust/README.md). This policy authenticates public
+repository attestations with transparency-log and certificate-timestamp evidence.
+It does not configure the different private-repository signing instance.
 
 The workflow publishes the accepted layout without repacking. GitHub's attestation
 action signs build provenance and the schema-3 acceptance predicate for that
-same index digest and attaches both to GHCR. A fresh `verify-published` retrieval
-must authenticate both statements, platform inventory, report and channel policy
-before success. Failure may leave an unqualified candidate in GHCR; it never
-moves a channel or dispatches promotion. Each architecture uses a distinct
-immutable candidate tag; this workflow does not claim a combined multiarch index.
+same index digest and attaches both to GHCR. A fresh `verify-candidate` retrieval
+must authenticate both statements, platform inventory and report before success.
+Its result is `candidate-verification.json`. Failure may leave an unqualified
+candidate in GHCR; it never moves a channel or dispatches promotion. Each
+architecture uses a distinct immutable candidate tag; this workflow does not claim
+a combined multiarch index.
+
+Candidate authentication is separate from release-channel admission. OCI's
+`verify-published` remains the stronger promotion gate, including signed-channel
+and current-parent checks. An authenticated candidate alone does not authorize
+Hostweave scheduling. No release-channel root key is needed for this publication
+step, and none is generated.
+
+The Imageweave Go library dependency is OCI v0.1.3. The candidate workflow also
+needs the subsequent OCI CLI commit implementing `image verify-candidate`; its
+exact source revision is recorded in `tool-commits.txt`. Merge the OCI companion
+change before enabling publication. This command is not present in v0.1.3.
 
 Reports preserve tool commit pins, vendor source verification, firmware package
 versions/hashes, Packer manifest, importer receipt and runtime observations. They
