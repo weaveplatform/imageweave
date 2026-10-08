@@ -10,7 +10,7 @@ import (
 
 	"github.com/deploymenttheory/go-sdk-winmediafoundry/pkg/udf"
 
-	"github.com/weaveplatform/imageweave/internal/disk/vhd"
+	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/vhd"
 )
 
 func moveWindowsRaw(disk, destination string) error {

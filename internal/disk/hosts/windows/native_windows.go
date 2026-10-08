@@ -1,6 +1,6 @@
 //go:build windows
 
-package virtualdisk
+package windowsdisk
 
 import (
 	"fmt"

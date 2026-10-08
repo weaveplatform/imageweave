@@ -26,6 +26,29 @@ engine. Migrated Windows fallback and agent/desktop commands preserve their
 behavior while Packer scenario adapters replace them incrementally. Base-image
 candidate delivery uses the pinned Packer templates.
 
+## Disk formats and host backends
+
+Disk responsibilities are grouped by portable format and host capability,
+independently of the guest operating system:
+
+| Package | Responsibility |
+|---|---|
+| `weaveplatform-oci/pkg/disk/vhd` | Shared portable fixed-VHD footer, geometry and raw-sector codec; used on every supported host |
+| `internal/disk/hosts/windows` (`windowsdisk`) | Windows virtdisk create/convert operations, native handles and source-container detection |
+
+Native Packer construction, migrated Windows construction and destination export
+all use this one local Windows host backend. It imports the shared VHD codec;
+it does not implement another footer parser. Non-Windows builds preserve the
+explicit unsupported-host error for native disk operations. Linux and macOS
+continue to use their existing file/QEMU operations; no empty host packages or
+unused backend interface are added.
+
+The deleted local VHD codec had the same exported behavior and identical public
+contract tests and fixtures as the pinned OCI codec. Disk-format tests belong
+with that codec; Imageweave retains host-backend and caller integration tests.
+VHDX remains a possible local Windows working container, not a requirement of
+OCI artifacts or a cross-platform codec implemented by this project.
+
 ## Native acceptance boundary
 
 `pkg/nativebuild` produces construction results marked `unverified`. A macOS

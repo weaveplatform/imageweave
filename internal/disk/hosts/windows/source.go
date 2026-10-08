@@ -1,11 +1,11 @@
-package virtualdisk
+package windowsdisk
 
 import (
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/weaveplatform/imageweave/internal/disk/vhd"
+	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/vhd"
 )
 
 // sourceFormat uses container bytes, not the extension. virtdisk's source type

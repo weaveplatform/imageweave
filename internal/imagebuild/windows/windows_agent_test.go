@@ -15,11 +15,11 @@ import (
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
+	windowsdisk "github.com/weaveplatform/imageweave/internal/disk/hosts/windows"
 	common "github.com/weaveplatform/imageweave/internal/imagebuild"
 	"github.com/weaveplatform/imageweave/internal/testbundle"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/chunk"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/vhd"
-	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/virtualdisk"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/pack"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/spec"
 )
@@ -230,8 +230,8 @@ func TestCloneWindowsDiskNeverModifiesParent(t *testing.T) {
 				ctx,
 				raw,
 				dst,
-				func(_ context.Context, source, destination string, format virtualdisk.Format) error {
-					if destination != dst || format != virtualdisk.VHDX {
+				func(_ context.Context, source, destination string, format windowsdisk.Format) error {
+					if destination != dst || format != windowsdisk.VHDX {
 						t.Fatal(destination, format)
 					}
 					if mode == "convert" {

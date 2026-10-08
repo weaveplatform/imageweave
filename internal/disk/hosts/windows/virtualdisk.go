@@ -1,7 +1,7 @@
-// Package virtualdisk uses Windows' virtual-disk APIs for local VHDX storage.
+// Package windowsdisk uses Windows' virtual-disk APIs for local VHDX storage.
 // Fixed VHD is an import/export bridge to raw OCI sectors, never the VM's
 // working disk. Conversion creates a new file and leaves the source intact.
-package virtualdisk
+package windowsdisk
 
 import (
 	"context"

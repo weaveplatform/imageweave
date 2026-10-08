@@ -11,10 +11,10 @@ import (
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
+	windowsdisk "github.com/weaveplatform/imageweave/internal/disk/hosts/windows"
 	common "github.com/weaveplatform/imageweave/internal/imagebuild"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/chunk"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/vhd"
-	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/virtualdisk"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/pack"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/spec"
 )
@@ -22,7 +22,7 @@ import (
 func cloneWindowsDisk(
 	ctx context.Context,
 	raw, destination string,
-	convert func(context.Context, string, string, virtualdisk.Format) error,
+	convert func(context.Context, string, string, windowsdisk.Format) error,
 ) error {
 	bridge := destination + ".import.vhd"
 	if err := common.CopyFileContext(ctx, raw, bridge); err != nil {
@@ -32,7 +32,7 @@ func cloneWindowsDisk(
 	if err := vhd.Append(bridge, time.Now()); err != nil {
 		return fmt.Errorf("create parent import bridge: %w", err)
 	}
-	return convert(ctx, bridge, destination, virtualdisk.VHDX)
+	return convert(ctx, bridge, destination, windowsdisk.VHDX)
 }
 
 // BuildWindowsAgent installs a verified offline payload into a native HCS

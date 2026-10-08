@@ -1,6 +1,6 @@
 //go:build windows
 
-package virtualdisk
+package windowsdisk
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/imageweave/internal/disk/vhd"
+	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/vhd"
 )
 
 func TestNativeRoundTrip(t *testing.T) {

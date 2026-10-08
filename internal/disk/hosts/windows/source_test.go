@@ -1,4 +1,4 @@
-package virtualdisk
+package windowsdisk
 
 import (
 	"os"
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/imageweave/internal/disk/vhd"
+	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/vhd"
 )
 
 func TestSourceFormatUsesBytes(t *testing.T) {

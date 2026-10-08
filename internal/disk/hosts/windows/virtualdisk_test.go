@@ -1,4 +1,4 @@
-package virtualdisk
+package windowsdisk
 
 import (
 	"context"

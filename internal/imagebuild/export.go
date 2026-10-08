@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
+	windowsdisk "github.com/weaveplatform/imageweave/internal/disk/hosts/windows"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/chunk"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/vhd"
-	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/virtualdisk"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/pack"
 	"github.com/weaveplatform/weaveplatform-oci/pkg/spec"
 )
@@ -203,7 +203,7 @@ func (t Tools) exportDisk(ctx context.Context, source, dest, format string) erro
 			if err := vhd.Append(source, time.Now()); err != nil {
 				return fmt.Errorf("VHDX bridge: %w", err)
 			}
-			if err := virtualdisk.Convert(ctx, source, dest, virtualdisk.VHDX); err != nil {
+			if err := windowsdisk.Convert(ctx, source, dest, windowsdisk.VHDX); err != nil {
 				return fmt.Errorf("convert VHDX: %w", err)
 			}
 			return nil

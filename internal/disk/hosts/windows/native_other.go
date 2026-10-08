@@ -1,5 +1,5 @@
 //go:build !windows
 
-package virtualdisk
+package windowsdisk
 
 func native(request) error { return ErrHost }
