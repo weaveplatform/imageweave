@@ -1,6 +1,6 @@
 # Delivery migration validation — 2026-10-08
 
-The local Imageweave quality gate passed after the OS package split:
+An earlier local Imageweave quality-gate snapshot passed after the OS package split:
 `make gate` ran vet, lint, race/shuffle tests, the coverage gate, vulnerability
 checking and both CLI/plugin builds for six OS/architecture combinations.
 Coverage was **96.9% (3383/3492)**, with every measured package above 95%.
@@ -8,6 +8,14 @@ Linux was 96.2%, Windows 95.9%, macOS 99.0%, delivery 95.2%, CLI 98.0% and
 shared imagebuild 97.1%. No coverage exclusions or threshold reductions were added.
 Changed workflow files passed actionlint; delivery scripts passed shellcheck.
 Unit tests do not establish native or cloud execution.
+
+The final local `make gate`, after disk-code consolidation, workspace cleanup
+and formatting, passed at **96.8% (3261/3370)** with every measured package at
+least 95%. Lint reported zero issues, vulnerability checking found zero affecting
+vulnerabilities, and all twelve CLI/plugin cross-builds passed. The changed
+statement denominator reflects removed duplicate disk code. This local result
+does not claim completion of the new required CI Packer/OCI/runtime acceptance
+job; that job independently runs and contributes coverage in GitHub Actions.
 
 ## Live Linux qualification
 
