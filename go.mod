@@ -19,7 +19,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/spf13/cobra v1.10.2
 	github.com/weaveplatform/weaveplatform-agent-modules/sdk v0.2.7
-	github.com/weaveplatform/weaveplatform-oci v0.1.3-0.20261008050851-5f8bebbcdf6f
+	github.com/weaveplatform/weaveplatform-oci v0.1.3
 	github.com/zclconf/go-cty v1.19.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/sys v0.48.0

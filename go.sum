@@ -540,8 +540,8 @@ github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAh
 github.com/vmihailenco/tagparser/v2 v2.0.0/go.mod h1:Wri+At7QHww0WTrCBeu4J6bNtoV6mEfg5OIWRZA9qds=
 github.com/weaveplatform/weaveplatform-agent-modules/sdk v0.2.7 h1:7CSnTDGV2KB2Nit755PkRiJDq9FI+ctA3VfjXLVe0As=
 github.com/weaveplatform/weaveplatform-agent-modules/sdk v0.2.7/go.mod h1:0S4Gy8GPHFtOYcWN+fLWrlAt7mDqr0cSXC/G6bM6eSE=
-github.com/weaveplatform/weaveplatform-oci v0.1.3-0.20261008050851-5f8bebbcdf6f h1:RVKYJ9gAGsWQJgzOvpIFKFHhWEDQRLfp4Bc7JzBhM2A=
-github.com/weaveplatform/weaveplatform-oci v0.1.3-0.20261008050851-5f8bebbcdf6f/go.mod h1:17sWrmApXZcLB4UN+rvsJmTjGbypXC9Dr6AcRvYCIZ4=
+github.com/weaveplatform/weaveplatform-oci v0.1.3 h1:RY85EDqmJYCCKJS7rkBx3/TPEiEe8SDFK0Tpd2JTp4w=
+github.com/weaveplatform/weaveplatform-oci v0.1.3/go.mod h1:5Thc3LC499PmMSLzRYunqKpf07zgMT47ZvrujYTqhoE=
 github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 h1:ilQV1hzziu+LLM3zUTJ0trRztfwgjqKnBWNtSRkbmwM=
 github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78/go.mod h1:aL8wCCfTfSfmXjznFBSZNN13rSJjlIOI1fUNAtF7rmI=
 github.com/zalando/go-keyring v0.2.6 h1:r7Yc3+H+Ux0+M72zacZoItR3UDxeWfKTcabvkI8ua9s=
