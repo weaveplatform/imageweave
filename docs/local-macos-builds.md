@@ -139,7 +139,10 @@ account or machine if host filesystem isolation is required.
 
 Install the checksum-verified `osx-arm64` runner from the
 [official runner releases](https://github.com/actions/runner/releases), outside
-any source checkout. Register it at organization scope using GitHub's short-lived
+any source checkout, in a path without spaces (for example,
+`~/.local/share/imageweave-runner`). The pinned `actions/setup-go` failed its
+`go version` invocation when the runner was under `Application Support`.
+Register it at organization scope using GitHub's short-lived
 registration token and `--runnergroup imageweave-macos --labels imageweave-macos`.
 Configure an absolute existing `WEAVE_IMAGE_WORKSPACE` in the runner's local
 `.env`; host storage paths and credentials must never be committed. Keep the
@@ -152,6 +155,14 @@ From the runner installation directory, `./svc.sh install` and `./svc.sh start`
 install and start the official user LaunchAgent. `./svc.sh status` checks it and
 `./svc.sh stop` takes the Mac offline. The user session must be available; the
 workflow uses `caffeinate` during native construction and acceptance.
+
+When image storage is on an external volume, macOS may prompt for removable-volume
+access for the runner's bundled `externals/node24/bin/node` process. Approve that
+once in the logged-in user session. Until approval, directory operations can
+block, including the workflow's initial workspace creation. This is a macOS
+privacy permission, separate from GitHub runner-group and publication approvals;
+repeatedly dispatching jobs will not resolve it. Grant removable-volume access
+only; this workflow does not require broad Full Disk Access.
 
 GitHub requires a selected workflow to exist at its specified ref. Before this
 workflow is merged, create the dedicated group with selected repository access
