@@ -100,6 +100,11 @@ func (c Catalog) Resolve(family, release, arch string) (Selection, error) {
 
 // Template permits only an implemented scenario. Listed targets are not build promises.
 func (s Selection) Template(purpose, target string) (string, error) {
+	if s.Status == "template" && purpose == "guest-prepared" && s.Family == "macos" &&
+		s.Arch == "arm64" &&
+		target == "apple-vz" {
+		return "templates/macos/prepared", nil
+	}
 	if s.Status != "template" || purpose != "guest-base" {
 		return "", fmt.Errorf("%w: %s/%s/%s purpose=%s target=%s: %s",
 			ErrBuild, s.Family, s.Version, s.Arch, purpose, target, s.Reason)

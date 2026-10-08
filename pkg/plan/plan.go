@@ -30,25 +30,33 @@ type File struct {
 }
 
 // Request contains only build configuration, not SSH private key contents.
+type Parent struct {
+	Layout string `yaml:"layout" json:"layout"`
+	Ref    string `yaml:"ref"    json:"ref"`
+	Name   string `yaml:"name"   json:"name"`
+	Digest string `yaml:"digest" json:"digest"`
+}
+
 type Request struct {
-	Edition       string `yaml:"edition"       json:"edition,omitempty"`
-	Language      string `yaml:"language"      json:"language,omitempty"`
-	Timeout       string `yaml:"timeout"       json:"timeout,omitempty"`
-	SchemaVersion int    `yaml:"schemaVersion" json:"schemaVersion"`
-	Family        string `yaml:"family"        json:"family"`
-	Release       string `yaml:"release"       json:"release"`
-	Arch          string `yaml:"arch"          json:"arch"`
-	Purpose       string `yaml:"purpose"       json:"purpose"`
-	Target        string `yaml:"target"        json:"target"`
-	SourceURL     string `yaml:"sourceURL"     json:"sourceURL"`
-	SourceSHA256  string `yaml:"sourceSHA256"  json:"sourceSHA256"`
-	SourceBuild   string `yaml:"sourceBuild"   json:"sourceBuild"`
-	Workspace     string `yaml:"workspace"     json:"workspace"`
-	SSHPrivateKey string `yaml:"sshPrivateKey" json:"sshPrivateKey"`
-	SSHPublicKey  string `yaml:"sshPublicKey"  json:"sshPublicKey"`
-	FirmwareCode  File   `yaml:"firmwareCode"  json:"firmwareCode"`
-	FirmwareVars  File   `yaml:"firmwareVars"  json:"firmwareVars"`
-	Accelerator   string `yaml:"accelerator"   json:"accelerator"`
+	Parent        *Parent `yaml:"parent,omitempty" json:"parent,omitempty"`
+	Edition       string  `yaml:"edition"          json:"edition,omitempty"`
+	Language      string  `yaml:"language"         json:"language,omitempty"`
+	Timeout       string  `yaml:"timeout"          json:"timeout,omitempty"`
+	SchemaVersion int     `yaml:"schemaVersion"    json:"schemaVersion"`
+	Family        string  `yaml:"family"           json:"family"`
+	Release       string  `yaml:"release"          json:"release"`
+	Arch          string  `yaml:"arch"             json:"arch"`
+	Purpose       string  `yaml:"purpose"          json:"purpose"`
+	Target        string  `yaml:"target"           json:"target"`
+	SourceURL     string  `yaml:"sourceURL"        json:"sourceURL"`
+	SourceSHA256  string  `yaml:"sourceSHA256"     json:"sourceSHA256"`
+	SourceBuild   string  `yaml:"sourceBuild"      json:"sourceBuild"`
+	Workspace     string  `yaml:"workspace"        json:"workspace"`
+	SSHPrivateKey string  `yaml:"sshPrivateKey"    json:"sshPrivateKey"`
+	SSHPublicKey  string  `yaml:"sshPublicKey"     json:"sshPublicKey"`
+	FirmwareCode  File    `yaml:"firmwareCode"     json:"firmwareCode"`
+	FirmwareVars  File    `yaml:"firmwareVars"     json:"firmwareVars"`
+	Accelerator   string  `yaml:"accelerator"      json:"accelerator"`
 }
 
 // Plan is a resolved candidate build, never acceptance or publication permission.
@@ -78,6 +86,12 @@ func Decode(r io.Reader) (Request, error) {
 // Resolve verifies local inputs and freezes the catalog selection.
 // Source authentication is the caller's responsibility; Packer verifies its byte hash.
 func Resolve(r Request) (Plan, error) {
+	if r.Purpose == "guest-prepared" {
+		return resolvePrepared(r)
+	}
+	if r.Parent != nil {
+		return Plan{}, fmt.Errorf("%w: parent only applies to prepared images", ErrInput)
+	}
 	if r.Family == "macos" || r.Family == "windows-11" {
 		return resolveNative(r)
 	}

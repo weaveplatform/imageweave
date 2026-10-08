@@ -135,13 +135,15 @@ func validate(o Options, run Runner) error {
 
 func validateCommon(o Options, run Runner) error {
 	u, err := url.Parse(o.SourceURI)
+	prepared := o.Request.Purpose == "guest-prepared" && o.Request.Parent != nil &&
+		o.SourceURI == ""
 	if !commitPattern.MatchString(o.RecipeCommit) || !versionPattern.MatchString(o.Version) ||
-		err != nil ||
-		u.Scheme != "https" ||
-		u.Host == "" ||
-		u.User != nil ||
-		u.RawQuery != "" ||
-		u.Fragment != "" {
+		(!prepared && (err != nil ||
+			u.Scheme != "https" ||
+			u.Host == "" ||
+			u.User != nil ||
+			u.RawQuery != "" ||
+			u.Fragment != "")) {
 		return fmt.Errorf(
 			"%w: commit SHA, immutable version and credential-free HTTPS source URI required",
 			ErrInput,

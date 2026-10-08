@@ -65,6 +65,26 @@ func BuildNative(ctx context.Context, o Options, run Runner, log io.Writer) (Con
 		{o.OCI, []string{"pack", bundle, "--out", layout, "--tag", o.Version}},
 		{o.OCI, []string{"inspect", layout, "--ref", o.Version, "--deep", "--strict", "--json"}},
 	}
+	if o.Request.Parent != nil {
+		p := o.Request.Parent
+		commands[3].args = []string{
+			"bundle",
+			"import-imageweave",
+			manifest,
+			"--recipe-commit",
+			o.RecipeCommit,
+			"--parent-layout",
+			p.Layout,
+			"--parent-ref",
+			p.Ref,
+			"--parent-name",
+			p.Name,
+			"--version",
+			o.Version,
+			"--out",
+			bundle,
+		}
+	}
 	if err := execute(ctx, commands, run, log); err != nil {
 		return result, err
 	}

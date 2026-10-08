@@ -46,20 +46,9 @@ func (*Builder) ConfigSpec() hcldec.ObjectSpec {
 
 func (b *Builder) Prepare(raws ...any) ([]string, []string, error) {
 	b.config = configuration{}
-	// The SDK decoder's cty path expects generated flattened config. This small
-	// all-string schema normalizes HCL values before using the SDK's strict decoder.
-	normalized := make([]any, len(raws))
-	for i, raw := range raws {
-		if value, ok := raw.(cty.Value); ok {
-			encoded, err := (ctyjson.SimpleJSONValue{Value: value}).MarshalJSON()
-			if err != nil {
-				return nil, nil, fmt.Errorf("encode HCL configuration: %w", err)
-			}
-			if err := json.Unmarshal(encoded, &raw); err != nil {
-				return nil, nil, fmt.Errorf("decode HCL configuration: %w", err)
-			}
-		}
-		normalized[i] = raw
+	normalized, err := normalizeConfiguration(raws)
+	if err != nil {
+		return nil, nil, err
 	}
 	if err := config.Decode(
 		&b.config,
@@ -112,7 +101,11 @@ type artifact struct{ result nativebuild.Result }
 func (a *artifact) BuilderId() string { return "weaveplatform.imageweave.native" }
 func (a *artifact) Id() string        { return a.result.Config.OutputDirectory }
 func (a *artifact) String() string {
-	return "Unverified " + a.result.Config.Family + " base: " + a.Id()
+	tier := "base"
+	if a.result.Prepared != nil {
+		tier = "prepared"
+	}
+	return "Unverified " + a.result.Config.Family + " " + tier + ": " + a.Id()
 }
 
 func (a *artifact) Files() []string {
@@ -156,3 +149,22 @@ func (sealedCommunicator) Upload(string, io.Reader, *os.FileInfo) error   { retu
 func (sealedCommunicator) UploadDir(string, string, []string) error       { return errSealed }
 func (sealedCommunicator) Download(string, io.Writer) error               { return errSealed }
 func (sealedCommunicator) DownloadDir(string, string, []string) error     { return errSealed }
+
+func normalizeConfiguration(raws []any) ([]any, error) {
+	// The SDK decoder's cty path expects generated flattened config. This small
+	// all-string schema normalizes HCL values before using the SDK's strict decoder.
+	normalized := make([]any, len(raws))
+	for i, raw := range raws {
+		if value, ok := raw.(cty.Value); ok {
+			encoded, err := (ctyjson.SimpleJSONValue{Value: value}).MarshalJSON()
+			if err != nil {
+				return nil, fmt.Errorf("encode HCL configuration: %w", err)
+			}
+			if err := json.Unmarshal(encoded, &raw); err != nil {
+				return nil, fmt.Errorf("decode HCL configuration: %w", err)
+			}
+		}
+		normalized[i] = raw
+	}
+	return normalized, nil
+}
