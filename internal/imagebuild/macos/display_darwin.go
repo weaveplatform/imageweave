@@ -28,10 +28,56 @@ import (
 // use _VZVNCServer; isolate that private API here and fail when it is unavailable.
 type appleDisplay struct {
 	server   purego.ID
-	client   *vnc.ClientConn
+	client   displayClient
+	calls    *displayCalls
 	conn     net.Conn
 	messages chan vnc.ServerMessage
 	frame    *image.RGBA
+}
+
+type displayClient interface {
+	inputClient
+	FramebufferUpdateRequest(bool, uint16, uint16, uint16, uint16) error
+	SetPixelFormat(*vnc.PixelFormat) error
+	SetEncodings([]vnc.Encoding) error
+}
+
+type displayCalls struct {
+	create    func(string) (purego.ID, error)
+	port      func(purego.ID) uint16
+	stop      func(purego.ID)
+	dial      func(context.Context, string) (net.Conn, error)
+	connect   func(net.Conn, *vnc.ClientConfig) (displayClient, int, int, error)
+	recognize func(image.Image) (macsetup.Screen, error)
+	wait      func(context.Context, time.Duration) error
+}
+
+func nativeDisplayCalls(m *appleMachine) *displayCalls {
+	return &displayCalls{
+		create: func(password string) (purego.ID, error) { return createVNC(m, password) },
+		port: func(server purego.ID) (port uint16) {
+			mainthread.Do(
+				func() { port = purego.Send[uint16](server, purego.RegisterName("port")) },
+			)
+			return
+		},
+		stop: func(server purego.ID) {
+			mainthread.Do(
+				func() { server.Send(purego.RegisterName("stop")); server.Send(purego.RegisterName("release")) },
+			)
+		},
+		dial: func(ctx context.Context, address string) (net.Conn, error) {
+			return (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, "tcp", address)
+		},
+		connect: func(conn net.Conn, config *vnc.ClientConfig) (displayClient, int, int, error) {
+			client, err := vnc.Client(conn, config)
+			if err != nil {
+				return nil, 0, 0, fmt.Errorf("VNC handshake: %w", err)
+			}
+			return client, int(client.FrameBufferWidth), int(client.FrameBufferHeight), nil
+		},
+		recognize: recognize, wait: pause,
+	}
 }
 
 func (m *appleMachine) screen(ctx context.Context) (macsetup.Screen, error) {
@@ -46,7 +92,7 @@ func (m *appleMachine) screen(ctx context.Context) (macsetup.Screen, error) {
 	if err != nil {
 		return macsetup.Screen{}, err
 	}
-	screen, err := recognize(frame)
+	screen, err := m.display.calls.recognize(frame)
 	if err == nil {
 		screen.Checks = macsetup.CheckboxStates(frame, screen)
 	}
@@ -64,55 +110,74 @@ func (m *appleMachine) input(ctx context.Context, actions []macsetup.Action) err
 		if err := applyInput(m.display.client, action); err != nil {
 			return fmt.Errorf("guest display: %w", err)
 		}
-		if err := pause(ctx, 150*time.Millisecond); err != nil {
+		if err := m.display.calls.wait(ctx, 150*time.Millisecond); err != nil {
 			return fmt.Errorf("guest display: %w", err)
 		}
 	}
 	return nil
 }
 
-func (m *appleMachine) openDisplay(ctx context.Context) (*appleDisplay, error) {
-	serverClass := purego.GetClass("_VZVNCServer")
-	securityClass := purego.GetClass("_VZVNCAuthenticationSecurityConfiguration")
+func createVNC(m *appleMachine, password string) (purego.ID, error) {
+	return createVNCWith(m, password, purego.GetClass)
+}
+
+func createVNCWith(
+	m *appleMachine,
+	password string,
+	lookup func(string) purego.Class,
+) (purego.ID, error) {
+	serverClass := lookup("_VZVNCServer")
+	securityClass := lookup("_VZVNCAuthenticationSecurityConfiguration")
 	if serverClass == 0 || securityClass == 0 {
-		return nil, fmt.Errorf("%w: Apple VNC adapter unavailable", ErrPrepared)
+		return 0, fmt.Errorf("%w: Apple VNC adapter unavailable", ErrPrepared)
 	}
-	d := &appleDisplay{messages: make(chan vnc.ServerMessage, 16)}
-	password := rand.Text()[:8]
+	var server purego.ID
 	mainthread.Do(func() {
 		security := purego.ID(securityClass).
 			Send(purego.RegisterName("alloc")).
 			Send(purego.RegisterName("initWithPassword:"), purego.NSString(password))
-		d.server = purego.ID(serverClass).
+		server = purego.ID(serverClass).
 			Send(purego.RegisterName("alloc")).
 			Send(purego.RegisterName("initWithPort:queue:securityConfiguration:"), uint16(0), dispatch.GetGlobalQueue(0, 0).Ptr(), security)
-		d.server.Send(purego.RegisterName("setVirtualMachine:"), obj.ID(m.vm))
-		d.server.Send(purego.RegisterName("start"))
+		server.Send(purego.RegisterName("setVirtualMachine:"), obj.ID(m.vm))
+		server.Send(purego.RegisterName("start"))
 		security.Send(purego.RegisterName("release"))
 	})
+	return server, nil
+}
+
+func (m *appleMachine) openDisplay(ctx context.Context) (*appleDisplay, error) {
+	calls := m.displayCalls
+	if calls == nil {
+		calls = nativeDisplayCalls(m)
+	}
+	d := &appleDisplay{calls: calls, messages: make(chan vnc.ServerMessage, 16)}
+	password := rand.Text()[:8]
+	var err error
+	d.server, err = calls.create(password)
+	if err != nil {
+		return nil, err
+	}
 	if d.server == 0 {
 		return nil, fmt.Errorf("%w: Apple VNC server creation failed", ErrPrepared)
 	}
 	var port uint16
 	for port == 0 {
-		mainthread.Do(func() { port = purego.Send[uint16](d.server, purego.RegisterName("port")) })
-		if err := pause(ctx, 50*time.Millisecond); err != nil {
+		port = calls.port(d.server)
+		if err := calls.wait(ctx, 50*time.Millisecond); err != nil {
 			d.close()
 			return nil, err
 		}
 	}
-	conn, err := (&net.Dialer{Timeout: 5 * time.Second}).DialContext(
-		ctx,
-		"tcp",
-		fmt.Sprintf("127.0.0.1:%d", port),
-	)
+	conn, err := calls.dial(ctx, fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		d.close()
 		return nil, fmt.Errorf("connect Apple display: %w", err)
 	}
 	d.conn = conn
 	_ = conn.SetDeadline(time.Now().Add(15 * time.Second))
-	d.client, err = vnc.Client(
+	var width, height int
+	d.client, width, height, err = calls.connect(
 		conn,
 		&vnc.ClientConfig{
 			Auth:            []vnc.ClientAuth{&vnc.PasswordAuth{Password: password}},
@@ -142,8 +207,13 @@ func (m *appleMachine) openDisplay(ctx context.Context) (*appleDisplay, error) {
 		d.close()
 		return nil, fmt.Errorf("initialize Apple display: %w", err)
 	}
+	if width < 1 || height < 1 || width > 65535 || height > 65535 ||
+		int64(width)*int64(height) > 16*1024*1024 {
+		d.close()
+		return nil, fmt.Errorf("%w: invalid display dimensions", ErrPrepared)
+	}
 	d.frame = image.NewRGBA(
-		image.Rect(0, 0, int(d.client.FrameBufferWidth), int(d.client.FrameBufferHeight)),
+		image.Rect(0, 0, width, height),
 	)
 	return d, nil
 }
@@ -153,32 +223,42 @@ func (d *appleDisplay) close() {
 		_ = d.conn.Close()
 	}
 	if d.server != 0 {
-		mainthread.Do(
-			func() { d.server.Send(purego.RegisterName("stop")); d.server.Send(purego.RegisterName("release")) },
-		)
+		d.calls.stop(d.server)
 		d.server = 0
 	}
 }
 
 func (d *appleDisplay) capture(ctx context.Context) (*image.RGBA, error) {
+	width, height := d.frame.Bounds().Dx(), d.frame.Bounds().Dy()
+	if width < 1 || height < 1 || width > 65535 || height > 65535 {
+		return nil, fmt.Errorf("%w: invalid display dimensions", ErrPrepared)
+	}
 	if err := d.client.FramebufferUpdateRequest(
 		false,
 		0,
 		0,
-		d.client.FrameBufferWidth,
-		d.client.FrameBufferHeight,
+		uint16(width),
+		uint16(height),
 	); err != nil {
 		return nil, fmt.Errorf("request framebuffer: %w", err)
 	}
-	timer := time.NewTimer(20 * time.Second)
-	defer timer.Stop()
+	return d.captureWait(ctx, time.After(20*time.Second))
+}
+
+func (d *appleDisplay) captureWait(
+	ctx context.Context,
+	timeout <-chan time.Time,
+) (*image.RGBA, error) {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, fmt.Errorf("macOS operation: %w", ctx.Err())
-		case <-timer.C:
+		case <-timeout:
 			return nil, fmt.Errorf("%w: framebuffer timed out", ErrPrepared)
-		case message := <-d.messages:
+		case message, open := <-d.messages:
+			if !open {
+				return nil, fmt.Errorf("%w: display connection closed", ErrPrepared)
+			}
 			update, ok := message.(*vnc.FramebufferUpdateMessage)
 			if !ok {
 				continue
@@ -187,6 +267,11 @@ func (d *appleDisplay) capture(ctx context.Context) (*image.RGBA, error) {
 				raw, ok := r.Enc.(*vnc.RawEncoding)
 				if !ok {
 					return nil, fmt.Errorf("%w: unexpected display encoding", ErrPrepared)
+				}
+				if r.Width == 0 || r.Height == 0 || len(raw.Colors) != int(r.Width)*int(r.Height) ||
+					int(r.X)+int(r.Width) > d.frame.Bounds().Dx() ||
+					int(r.Y)+int(r.Height) > d.frame.Bounds().Dy() {
+					return nil, fmt.Errorf("%w: invalid framebuffer rectangle", ErrPrepared)
 				}
 				for i, pixel := range raw.Colors {
 					x, y := int(r.X)+i%int(r.Width), int(r.Y)+i/int(r.Width)
