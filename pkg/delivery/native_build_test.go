@@ -55,6 +55,16 @@ func TestNativeConstructionMatrix(t *testing.T) {
 					if output != &log {
 						t.Fatal("diagnostics writer lost")
 					}
+					if binary == o.Packer && args[0] == "build" {
+						// Match the real native plugin: it creates the leaf only and
+						// refuses reuse. The delivery layer must supply its parent.
+						if err := os.Mkdir(
+							filepath.Join(o.Out, "packer", "candidate"),
+							0o700,
+						); err != nil {
+							return err
+						}
+					}
 					calls = append(calls, append([]string{binary}, args...))
 					return nil
 				},
@@ -124,7 +134,8 @@ func TestNativeConstructionMatrix(t *testing.T) {
 				variables["release"] != selection.Version {
 				t.Fatal(variables)
 			}
-			if !strings.Contains(log.String(), "weaveoci inspect started") {
+			if !strings.Contains(log.String(), "weaveoci inspect started") ||
+				!strings.Contains(log.String(), "checking pinned source and firmware hashes") {
 				t.Fatal(log.String())
 			}
 		})
