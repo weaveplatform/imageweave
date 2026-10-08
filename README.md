@@ -33,14 +33,18 @@ do not advance these stable/general-purpose tracks.
 - A native Packer plugin for Windows HCS installation/Sysprep and Apple IPSW restore.
 - Explicit source checksums, firmware checksums and per-build SSH keys.
 - A build result contract that does not confuse construction with acceptance.
-- Unit tests and a 95% Go coverage gate; Packer validation is a separate check.
+- A Packer-to-OCI delivery command with exact-artifact Linux qualification and an explicitly gated publication workflow.
+- OS-specific construction and qualification packages; see [platform boundaries](docs/platform-packages.md).
+- Migrated source acquisition, package locks, Windows fallback and agent/desktop preparation commands under `imageweave image`.
+- Unit tests and a 95% Go coverage gate; Packer and live VM validation are separate checks.
 
 Native templates: [Windows](templates/windows/README.md) and
 [macOS](templates/macos/README.md). The [native design record](docs/research/native-packer-builders.md)
 explains library reuse and output compatibility. [Native validation evidence](docs/native-validation-checkpoint.md)
 records the checks and remaining host requirements. Cloud provider templates,
-agent/desktop variants, the complete acceptance contract and automated
-OCI/Hostweave handoff remain integration work.
+Packer conversion of migrated agent/desktop scenarios, native runtime observation
+adapters and Hostweave consumption remain integration work. Migrating an existing
+command does not qualify a release/architecture combination.
 Ubuntu 26.04 arm64 has passed a real Packer build followed by OCI pack/unpack
 and two independent clone boots; see the [validation checkpoint](docs/validation-checkpoint.md).
 

@@ -1,0 +1,8 @@
+{
+  "sourceURL": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-42-1.1.aarch64.qcow2",
+  "sourceSHA256": "e10658419a8d50231037dc781c3155aa94180a8c7a74e5cac2a6b09eaa9342b7",
+  "sourceBuild": "42-1.1",
+  "checksumsURL": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Cloud/aarch64/images/Fedora-Cloud-42-1.1-aarch64-CHECKSUM",
+  "fingerprint": "B0F4950458F69E1150C6C5EDC8AC4916105EF944",
+  "keyring": "delivery/keys/fedora-42.asc"
+}

@@ -1,0 +1,247 @@
+name: images | Imageweave Linux candidate
+
+on:
+  pull_request:
+    paths:
+      - 'pkg/delivery/**'
+      - 'pkg/plan/**'
+      - 'pkg/catalog/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'internal/cli/delivery*'
+      - 'internal/imagebuild/**'
+      - 'templates/qemu/**'
+      - 'provision/linux/**'
+      - 'scripts/delivery/**'
+      - 'delivery/**'
+      - '.github/workflows/linux-candidate.yml'
+  schedule:
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      family:
+        description: Reviewed family (all includes Fedora pins)
+        type: choice
+        options: [ubuntu, fedora, all]
+        default: ubuntu
+      release:
+        description: Reviewed release window
+        type: choice
+        options: [n, n-1, n-2, all]
+        default: n
+      arch:
+        description: Build and accept on the matching architecture
+        type: choice
+        options: [arm64, amd64, all]
+        default: arm64
+      serial:
+        description: Optional Ubuntu vendor serial (empty resolves then pins current)
+        type: string
+        default: ''
+      revision:
+        description: Positive immutable candidate revision
+        type: string
+        default: '1'
+      publish:
+        description: Publish signed candidate after acceptance and verify against reviewed policy
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-candidate-${{ github.ref }}-${{ inputs.family }}-${{ inputs.release }}-${{ inputs.arch }}
+  cancel-in-progress: false
+
+env:
+  GOWORK: 'off'
+  OCI_COMMIT: 5f8bebbcdf6f3e6534b8ccf79e592512791bc01c
+
+jobs:
+  select:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select every requested catalog row without hiding missing pins
+        id: matrix
+        env:
+          FAMILY: ${{ inputs.family || 'ubuntu' }}
+          RELEASE: ${{ inputs.release || 'n' }}
+          ARCH: ${{ inputs.arch || 'arm64' }}
+          PUBLISH: ${{ inputs.publish || false }}
+        run: |
+          set -euo pipefail
+          if [ "$PUBLISH" = true ]; then
+            [ "$GITHUB_REF" = refs/heads/main ] || { echo 'Publication requires reviewed main'; exit 1; }
+            test -s delivery/admission-policy.json || { echo 'Configure reviewed policy, channel and public anchors before publication'; exit 1; }
+          fi
+          matrix=$(jq -c --arg family "$FAMILY" --arg release "$RELEASE" --arg arch "$ARCH" \
+            '{include:[.families[] | select(.id == "ubuntu" or .id == "fedora") | select($family == "all" or .id == $family) | .id as $f | .releases[] | select($release == "all" or .slot == $release) | .version as $v | .architectures[] | select($arch == "all" or .arch == $arch) | {family:$f,release:$v,arch:.arch,runner:(if .arch == "arm64" then "ubuntu-24.04-arm" else "ubuntu-24.04" end)}]}' pkg/catalog/releases.json)
+          jq -e '.include | length > 0' <<< "$matrix" >/dev/null
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  candidate:
+    needs: select
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    environment: ${{ inputs.publish && 'image-candidates' || 'image-builds' }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      FAMILY: ${{ matrix.family }}
+      RELEASE: ${{ matrix.release }}
+      ARCH: ${{ matrix.arch }}
+      SOURCE_SERIAL: ${{ inputs.serial }}
+      CANDIDATE_REVISION: ${{ inputs.revision || '1' }}
+    steps:
+      - uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: weaveplatform/weaveplatform-oci
+          ref: 5f8bebbcdf6f3e6534b8ccf79e592512791bc01c
+          path: .oci-tool
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install build tools and checksum-pinned Packer
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-system-arm qemu-utils ovmf qemu-efi-aarch64 cloud-image-utils genisoimage xorriso jq unzip
+          if [ -e /dev/kvm ]; then sudo chmod a+rw /dev/kvm; fi
+          WORK="$RUNNER_TEMP/imageweave"
+          echo "WORK=$WORK" >> "$GITHUB_ENV"
+          mkdir -p "$WORK/tools"
+          case "$ARCH" in
+            amd64) checksum=5edcd14ab59b535040c512dbecd6ec9ef976a000b073c19d93e4c431c948581e ;;
+            arm64) checksum=cf18f03460d92265d49b56befff333e80641d845822799eab04357c39f75b5d7 ;;
+            *) exit 2 ;;
+          esac
+          curl -fsSL "https://releases.hashicorp.com/packer/1.16.0/packer_1.16.0_linux_$ARCH.zip" -o "$WORK/packer.zip"
+          printf '%s  %s\n' "$checksum" "$WORK/packer.zip" | sha256sum -c -
+          unzip "$WORK/packer.zip" packer -d "$WORK/tools"
+          echo "$WORK/tools" >> "$GITHUB_PATH"
+      - name: Compile recipe and OCI tools from exact commits
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C .oci-tool rev-parse HEAD)" = "$OCI_COMMIT"
+          go build -trimpath -o "$WORK/tools/imageweave" ./cmd/imageweave
+          (cd .oci-tool && go build -trimpath -o "$WORK/tools/weaveoci" ./cmd/weaveoci)
+          echo "WEAVEOCI=$WORK/tools/weaveoci" >> "$GITHUB_ENV"
+          printf 'imageweave=%s\nweaveplatform-oci=%s\n' "$GITHUB_SHA" "$OCI_COMMIT" > "$WORK/tool-commits.txt"
+      - name: Authenticate source and pin source and firmware bytes
+        run: scripts/delivery/prepare-linux.sh "$FAMILY" "$RELEASE" "$ARCH" "$WORK"
+      - name: Packer build, OCI import, exact-artifact two-clone reboot acceptance
+        run: |
+          set -euo pipefail
+          imageweave delivery --request "$WORK/request.json" --recipe-commit "$GITHUB_SHA" \
+            --source-uri "$(jq -er .sourceURI "$WORK/metadata.json")" \
+            --version "$(jq -er .tag "$WORK/metadata.json")" --out "$WORK/delivery" \
+            > "$WORK/delivery.json"
+          jq -e '.schemaVersion == 3 and .passed == true' "$WORK/delivery/validated/acceptance.json"
+      - name: Log in to GHCR
+        if: inputs.publish
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Configure reviewed publication profile
+        if: inputs.publish
+        run: |
+          set -euo pipefail
+          # Policy and its referenced public trust files are reviewed repository
+          # contents. No keys, workflow identities or channels come from dispatch.
+          jq -e '.registry == "ghcr.io" and .trustedRoot != "" and .channel != "" and (.anchors|length)>0' delivery/admission-policy.json >/dev/null
+          jq -n --arg root "$GITHUB_WORKSPACE/delivery" --slurpfile p delivery/admission-policy.json \
+            '{schemaVersion:1,profiles:[{name:"github",kind:"github",registry:{host:"ghcr.io",namespace:"weaveplatform/weave-images"},signing:{provider:"github-attestation"},verify:{mode:"signature",identity:{issuer:$p[0].build.issuer,subjectRegexp:$p[0].build.subjectRegexp,trustedRoot:($root+"/"+$p[0].trustedRoot)}}}]}' > "$WORK/profiles.json"
+          echo "WEAVEOCI_PROFILES=$WORK/profiles.json" >> "$GITHUB_ENV"
+          weaveoci profile validate --profiles "$WORK/profiles.json"
+      - name: Publish the exact accepted layout
+        id: publish
+        if: inputs.publish
+        run: |
+          set -euo pipefail
+          tag=$(jq -er .tag "$WORK/metadata.json")
+          repository=$(jq -er .repository "$WORK/metadata.json")
+          digest=$(jq -er .indexDigest "$WORK/delivery/validated/acceptance.json")
+          weaveoci publish --layout "$WORK/delivery/validated/layout" --layout-ref "$tag" \
+            --expected-digest "$digest" --acceptance "$WORK/delivery/validated/acceptance.json" \
+            --repository "$repository" --tag "$tag" --promotion-out "$WORK/promotion.json"
+          # publish's generic GitHub provider leaves identity claims unset.
+          # Bind the dispatch claims to reviewed policy; verify-published later
+          # authenticates registry statements against that same policy.
+          jq --slurpfile p delivery/admission-policy.json \
+            '.signature.issuer=$p[0].build.issuer | .signature.subjectRegexp=$p[0].build.subjectRegexp' \
+            "$WORK/promotion.json" > "$WORK/promotion-bound.json"
+          mv "$WORK/promotion-bound.json" "$WORK/promotion.json"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "name=ghcr.io/weaveplatform/weave-images/$repository" >> "$GITHUB_OUTPUT"
+      - name: Sign build provenance for the published index
+        if: inputs.publish
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.publish.outputs.name }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+      - name: Sign acceptance of the same index
+        if: inputs.publish
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.publish.outputs.name }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          predicate-type: https://weaveplatform.io/attestations/image-acceptance/v1
+          predicate-path: ${{ env.WORK }}/delivery/validated/acceptance.json
+          push-to-registry: true
+          create-storage-record: false
+      - name: Authenticate registry result with a fresh local audit layout
+        if: inputs.publish
+        run: |
+          set -euo pipefail
+          weaveoci image verify-published "$WORK/promotion.json" \
+            --policy delivery/admission-policy.json --out "$WORK/published-audit" > "$WORK/admission.json"
+          # A successful candidate does not dispatch or alter a release channel.
+      - name: Delete ephemeral build SSH credentials
+        if: always()
+        run: rm -f "$WORK/build-key" "$WORK/build-key.pub"
+      - name: Preserve diagnostics and exact acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-${{ matrix.family }}-${{ matrix.release }}-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ env.WORK }}/tool-commits.txt
+            ${{ env.WORK }}/source.json
+            ${{ env.WORK }}/request.json
+            ${{ env.WORK }}/metadata.json
+            ${{ env.WORK }}/firmware-packages.txt
+            ${{ env.WORK }}/delivery.json
+            ${{ env.WORK }}/delivery/packer/manifest.json
+            ${{ env.WORK }}/delivery/bundle/imageweave-import.json
+            ${{ env.WORK }}/delivery/validated/acceptance.json
+            ${{ env.WORK }}/delivery/validated/inspection.json
+            ${{ env.WORK }}/delivery/validated/reports
+            ${{ env.WORK }}/promotion.json
+            ${{ env.WORK }}/admission.json
