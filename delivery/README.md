@@ -124,14 +124,16 @@ Hostweave scheduling. No release-channel root key is needed for this publication
 step, and none is generated.
 
 The Imageweave Go library dependency is OCI v0.1.3. The candidate workflow also
-needs the subsequent OCI CLI commit implementing `image verify-candidate`; its
+uses a subsequent OCI CLI commit for publication and `image verify-candidate`; its
 exact source revision is recorded in `tool-commits.txt`. Merge the OCI companion
-change before enabling publication. This command is not present in v0.1.3.
+change before enabling publication. The verifier and complete publication
+metadata are not present in v0.1.3. The publication CLI writes the reviewed signer identity and guest OS version directly
+using the shared entry format; the workflow does not rewrite those fields.
 
 Reports preserve tool commit pins, vendor source verification, firmware package
 versions/hashes, Packer manifest, importer receipt and runtime observations. They
-exclude disks and SSH key material. Hosted signing/publication and additional
-platform boots must be executed before claiming those paths accepted.
+exclude disks and SSH key material. Additional platform boots must be executed
+before claiming those paths accepted.
 
 ## Existing mechanisms used
 
@@ -139,3 +141,26 @@ platform boots must be executed before claiming those paths accepted.
 - [Packer GitHub Actions workflow](https://developer.hashicorp.com/packer/tutorials/cloud-production/github-actions): CI drives the existing Packer executable and templates.
 - [GitHub attest action](https://github.com/actions/attest): immutable digest subjects and custom acceptance predicates are attached to the registry.
 - [GitHub artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations): OIDC workflow identities authenticate the evidence; a bare JSON report never grants promotion.
+
+## First registry publication: 2026-10-08
+
+[Run 37747143545](https://github.com/weaveplatform/imageweave/actions/runs/37747143545)
+built Ubuntu 26.04 amd64 from vendor serial `20260927`, passed two-clone KVM
+acceptance, published and signed the image. Its final verification step failed
+because the entry used `subjectRegexp` instead of `subject_regexp`; the publisher
+also omitted the Linux guest OS version. The publication tooling now emits both
+fields through OCI's typed entry format.
+
+The unchanged published artifact was independently pulled and verified against
+the reviewed policy using corrected local entry metadata. Both authenticated
+signers matched this repository's main-branch publishing workflow, and its
+schema-3 acceptance report passed. The original Actions run remains failed.
+
+- Repository: `ghcr.io/weaveplatform/weave-images/ubuntu-26.04-base`
+- Immutable tag: `26.04-20260927-amd64-r1`
+- Index: `sha256:ee20b6cf06f297ad8ee51086a615ecc6fcf5217f1d57dd31a94a0c032a64a3ae`
+- Platform: `sha256:0545c696ebac8e7c4e8f86f792bee1b0bd176bf6bc6725bde68688ec1e1a237d`
+
+After merging the metadata fix, use revision `2` for the next publication run;
+revision `1` already exists and must not be overwritten. No release channel has
+been promoted, and Hostweave runtime consumption has not yet been demonstrated.
