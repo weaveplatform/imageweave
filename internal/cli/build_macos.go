@@ -37,5 +37,7 @@ func newBuildMacOS(
 	cmd.Flags().StringVar(&o.Packer, "packer", "packer", "Packer 1.16.0 executable")
 	cmd.Flags().
 		StringVar(&o.OCI, "weaveoci", "", "Optional OCI executable; default builds the pinned Go module")
+	cmd.Flags().
+		StringVar(&o.Revision, "revision", "", "Optional immutable candidate revision (positive number or number-attempt)")
 	return cmd
 }

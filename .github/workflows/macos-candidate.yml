@@ -1,0 +1,176 @@
+name: images | Imageweave macOS candidate
+
+# The organization runner group must allow only this workflow on main. Labels
+# route jobs; the server-side group restrictions enforce the access boundary.
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Reviewed macOS release window
+        type: choice
+        options: [n, n-1, n-2, all]
+        default: n
+      publish:
+        description: Publish signed base candidate after native acceptance
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Serialize the physical Mac across every release and dispatch.
+concurrency:
+  group: macos-candidate
+  cancel-in-progress: false
+
+env:
+  GOWORK: 'off'
+
+jobs:
+  select:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Check out recipes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select releases and check publication approval
+        id: matrix
+        env:
+          RELEASE: ${{ inputs.release }}
+          PUBLISH: ${{ inputs.publish }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+        run: |
+          set -euo pipefail
+          if [ "$PUBLISH" = true ]; then
+            [ "$REPOSITORY_VISIBILITY" = public ] || { echo 'Candidate policy requires public Sigstore attestations'; exit 1; }
+            gh api "repos/$GITHUB_REPOSITORY/environments/image-candidates" \
+              --jq '[.protection_rules[] | select(.type == "required_reviewers") | .reviewers[]] | length > 0' \
+              > "$RUNNER_TEMP/candidate-reviewers.txt"
+            grep -qx true "$RUNNER_TEMP/candidate-reviewers.txt" || { echo 'image-candidates requires environment reviewers'; exit 1; }
+          fi
+          matrix=$(jq -c --arg release "$RELEASE" '{include:[.families[] | select(.id == "macos") | .releases[] | select($release == "all" or .slot == $release) | {release:.version}]}' pkg/catalog/releases.json)
+          jq -e '.include | length > 0' <<< "$matrix" >/dev/null
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  candidate:
+    name: Accept macOS ${{ matrix.release }} base
+    if: ${{ !inputs.publish }}
+    needs: select
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
+    runs-on:
+      group: imageweave-macos
+      labels: [self-hosted, macOS, ARM64, imageweave-macos]
+    timeout-minutes: 720
+    environment: image-builds
+    permissions:
+      contents: read
+    env:
+      RELEASE: ${{ matrix.release }}
+    steps:
+      - name: Check out recipes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and accept candidate
+        uses: ./.github/actions/macos-candidate
+      - name: Preserve diagnostics and acceptance evidence
+        if: always() && env.WORK != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-${{ matrix.release }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ env.WORK }}/tool-versions.txt
+            ${{ env.WORK }}/build.log
+            ${{ env.WORK }}/results.json
+            ${{ env.WORK }}/macos-*-source.json
+            ${{ env.WORK }}/*/acceptance/acceptance.json
+            ${{ env.WORK }}/*/acceptance/*/*.json
+
+  publish:
+    name: Publish macOS ${{ matrix.release }} base
+    if: inputs.publish && github.ref == 'refs/heads/main' && github.event.repository.visibility == 'public'
+    needs: select
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
+    runs-on:
+      group: imageweave-macos
+      labels: [self-hosted, macOS, ARM64, imageweave-macos]
+    timeout-minutes: 720
+    environment: image-candidates
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      RELEASE: ${{ matrix.release }}
+    steps:
+      - name: Check out recipes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and accept candidate
+        uses: ./.github/actions/macos-candidate
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Configure reviewed publication profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.registry == "ghcr.io" and .trustedRoot != "" and (has("channel") | not) and (has("anchors") | not)' delivery/macos-candidate-policy.json >/dev/null
+          jq -n --arg root "$GITHUB_WORKSPACE/delivery" --slurpfile p delivery/macos-candidate-policy.json \
+            '{schemaVersion:1,profiles:[{name:"github",kind:"github",registry:{host:"ghcr.io",namespace:"weaveplatform/weave-images"},signing:{provider:"github-attestation"},verify:{mode:"signature",identity:{issuer:$p[0].build.issuer,subjectRegexp:$p[0].build.subjectRegexp,trustedRoot:($root+"/"+$p[0].trustedRoot)}}}]}' > "$WORK/profiles.json"
+          echo "WEAVEOCI_PROFILES=$WORK/profiles.json" >> "$GITHUB_ENV"
+          weaveoci profile validate --profiles "$WORK/profiles.json"
+      - name: Publish and verify base candidate
+        uses: ./.github/actions/publish-macos-candidate
+      - name: Preserve diagnostics and acceptance evidence
+        if: always() && env.WORK != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-${{ matrix.release }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ env.WORK }}/tool-versions.txt
+            ${{ env.WORK }}/build.log
+            ${{ env.WORK }}/results.json
+            ${{ env.WORK }}/macos-*-source.json
+            ${{ env.WORK }}/*/acceptance/acceptance.json
+            ${{ env.WORK }}/*/acceptance/*/*.json
+            ${{ env.WORK }}/base-promotion.json
+            ${{ env.WORK }}/base-verification.json
+      - name: Remove job registry credentials
+        if: always() && env.WORK != ''
+        shell: bash
+        run: rm -f "$WORK/docker/config.json"
+      - name: Reclaim published image workspace
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only this job's mktemp workspace is removed, after registry read-back
+          # and the evidence upload succeed. Failed builds remain for diagnosis.
+          case "$WORK" in
+            "$WEAVE_IMAGE_WORKSPACE"/macos-"$GITHUB_RUN_ID"-"$GITHUB_RUN_ATTEMPT"-"$RELEASE".*) rm -rf -- "$WORK" ;;
+            *) echo 'Refusing unexpected workspace path' >&2; exit 1 ;;
+          esac

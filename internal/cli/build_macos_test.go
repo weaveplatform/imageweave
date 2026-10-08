@@ -19,7 +19,7 @@ func TestStandaloneMacOSFlags(t *testing.T) {
 				o.Tier != "base" ||
 				o.Timeout != "2h" ||
 				o.Packer != "/tools/packer" ||
-				o.OCI != "/tools/oci" {
+				o.OCI != "/tools/oci" || o.Revision != "123-2" {
 				t.Fatal(o)
 			}
 			_, _ = io.WriteString(log, "stage progress")
@@ -30,6 +30,8 @@ func TestStandaloneMacOSFlags(t *testing.T) {
 	c.SetErr(io.Discard)
 	c.SetArgs(
 		[]string{
+			"--revision",
+			"123-2",
 			"--workspace",
 			"/images",
 			"--repository",
@@ -58,7 +60,9 @@ func TestStandaloneMacOSFailures(t *testing.T) {
 	failed := errors.New("build failed")
 	c := newBuildMacOS(
 		func(_ context.Context, o macosbuild.Options, _ io.Writer) ([]macosbuild.Result, error) {
-			if o.Release != "all" || o.Tier != "all" || o.Timeout != "90m" || o.Packer != "packer" {
+			if o.Release != "all" || o.Tier != "all" || o.Timeout != "90m" ||
+				o.Packer != "packer" ||
+				o.Revision != "" {
 				t.Fatal(o)
 			}
 			return nil, failed

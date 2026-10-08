@@ -52,6 +52,7 @@ func source() macos.AppleSource {
 		Size:    4096,
 	}
 }
+
 func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
@@ -392,5 +393,49 @@ func TestArtifactBindings(t *testing.T) {
 	}
 	if _, err = inspect(t.Context(), t.TempDir(), "missing"); err == nil {
 		t.Fatal("missing tag accepted")
+	}
+}
+
+func TestRevisionSeparatesCandidatesAndPreservesReuse(t *testing.T) {
+	o := options(t)
+	o.Tier = "base"
+	builds := 0
+	api := fixtureServices(t, &builds)
+	var previous string
+	for _, revision := range []string{"1", "37780000000-1", "37780000000-2"} {
+		o.Revision = revision
+		_, err := selections(o)
+		must(t, err)
+		result, err := run(t.Context(), o, []string{"26"}, tools{commit: testCommit}, api, nil)
+		must(t, err)
+		if len(result) != 1 || !strings.HasSuffix(result[0].Version, "-r"+revision) ||
+			result[0].Layout == previous {
+			t.Fatalf("revision did not create an independent candidate: %+v", result)
+		}
+		previous = result[0].Layout
+		reused, err := run(t.Context(), o, []string{"26"}, tools{commit: testCommit}, api, nil)
+		must(t, err)
+		if !reused[0].Reused || reused[0].Digest != result[0].Digest {
+			t.Fatalf("revision did not reuse its verified candidate: %+v", reused)
+		}
+	}
+	if builds != 3 {
+		t.Fatalf("built %d times, want three independent revisions", builds)
+	}
+}
+
+func TestInvalidRevisionRejectedBeforeWorkspaceCreation(t *testing.T) {
+	for _, revision := range []string{"0", "-1", "01", "1-0", "1-01", "1/../../other", "1\n2", "1-2-3", strings.Repeat("1", 21), "1-" + strings.Repeat("1", 11)} {
+		t.Run(revision, func(t *testing.T) {
+			o := options(t)
+			o.Workspace = filepath.Join(o.Workspace, "absent")
+			o.Revision = revision
+			if _, err := Run(t.Context(), o, nil); !errors.Is(err, ErrBuild) {
+				t.Fatalf("invalid revision error: %v", err)
+			}
+			if _, err := os.Stat(o.Workspace); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("invalid revision created workspace")
+			}
+		})
 	}
 }

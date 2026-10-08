@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,7 +32,7 @@ var ErrBuild = errors.New("macOS build workflow")
 // downloads, artifacts and reports; repository files contain no lab paths.
 type Options struct {
 	Workspace, Repository, Release, Tier, Packer, OCI string
-	Timeout                                           string
+	Timeout, Revision                                 string
 }
 
 type Result struct {
@@ -123,6 +124,13 @@ func productionServices(o Options, installed tools, log io.Writer) services {
 }
 
 func selections(o Options) ([]string, error) {
+	if o.Revision != "" &&
+		!regexp.MustCompile(`^[1-9][0-9]{0,19}(-[1-9][0-9]{0,9})?$`).MatchString(o.Revision) {
+		return nil, fmt.Errorf(
+			"%w: revision must be a positive number, optionally followed by -attempt",
+			ErrBuild,
+		)
+	}
 	if !filepath.IsAbs(o.Workspace) || filepath.Clean(o.Workspace) != o.Workspace ||
 		o.Repository == "" ||
 		o.Packer == "" ||
@@ -275,6 +283,9 @@ func buildTier(
 	log io.Writer,
 ) (Result, conformance.Report, error) {
 	tag := source.Version + "-" + source.Build + "-" + tier + "-" + installed.commit[:12]
+	if o.Revision != "" {
+		tag += "-r" + o.Revision
+	}
 	out := filepath.Join(o.Workspace, tag)
 	result := Result{
 		Version:    tag,
