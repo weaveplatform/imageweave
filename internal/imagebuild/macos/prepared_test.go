@@ -287,7 +287,8 @@ func TestMacOSAcceptanceNeverRepairsPreparedClone(t *testing.T) {
 			io.Discard,
 		)
 		must(t, err)
-		if !b.Passed || b.MachineID != "hardware-uuid" || b.ElapsedSeconds <= 0 ||
+		// Fake lifecycle operations may finish within one Windows clock tick.
+		if !b.Passed || b.MachineID != "hardware-uuid" || b.ElapsedSeconds < 0 ||
 			v.setup[0] != (variant == "base") ||
 			v.setup[1] {
 			t.Fatal(b, v.setup)
