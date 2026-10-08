@@ -59,18 +59,34 @@ preflight check, not a reservation against unrelated processes consuming space.
 
 Sizing uses the 80 GiB logical disk size without assuming compression or sparse
 allocation savings. Each retained image budgets three copies (Packer output,
-imported bundle and OCI), plus 40 GiB restore media. One additional 80 GiB copy
-covers sequential clone acceptance or publication read-back. A base-only job
-therefore requires 360 GiB image capacity, plus an 8 GiB free-space reserve.
-Host tool scratch requires 4 GiB plus the reserve; shared pools add both demands
-and count the reserve once. Oversized restore media is rejected before download.
-This deliberately conservative bound can exceed the eventual physical usage.
+imported bundle and OCI). One additional 80 GiB copy covers sequential clone
+acceptance or publication read-back. Construction therefore requires 320 GiB
+plus an 8 GiB free-space reserve for one base image. Before downloading an IPSW,
+the next check adds only the actual bytes still to download. Cached bytes already
+reduce measured free space and are never reserved a second time. A 25 GiB new
+IPSW therefore needs 353 GiB before transfer, then 328 GiB after transfer.
+Host tool scratch requires 4 GiB plus reserve; shared pools add both demands and
+count the reserve once. Restore media exceeding 40 GiB is rejected. The initial
+plan checks construction capacity; media allocation is checked when the exact
+source and any resumable partial download are known.
 
-Local multi-image runs retain their outputs, so the estimate includes all of
-them: `--release all --tier all` budgets six images, or 1760 GiB plus reserve.
-The publishing workflow builds, accepts, publishes and removes each successful
-job's workspace before beginning the next image. Failed and build-only outputs
-are retained. No pre-existing images are deleted to make room.
+Local multi-image runs retain their outputs, so the construction estimate includes
+all of them: `--release all --tier all` budgets six images, or 1520 GiB plus
+reserve, with remaining media checked before each transfer. The publishing
+workflow builds, accepts, publishes and removes each successful job's workspace
+before beginning the next image. Failed and build-only outputs are retained.
+
+Automatic workspaces and the Actions workflow use a shared `media/` directory
+beside job workspaces. `--shared-media-cache` enables that layout for an explicitly
+selected job workspace. Standalone explicit workspaces default to their own
+`media/` directory. Shared cache files survive successful job-workspace cleanup.
+The driver also examines previous attempts' `media/` directories, verifies the
+selected source's size and SHA-256, and adopts a match with a hard link instead
+of copying or downloading another IPSW. Logs explicitly report verification and
+`download skipped`. Different or corrupt bytes are never used for installation;
+a corrupt entry at the requested cache address is removed before a fresh fetch.
+Existing partial downloads in the selected cache resume only when their metadata
+matches the source lock. The capacity check includes only their missing bytes.
 
 `--workspace /absolute/path` pins storage instead of selecting it automatically.
 Use a pinned workspace to reliably reuse source locks and outputs: automatic

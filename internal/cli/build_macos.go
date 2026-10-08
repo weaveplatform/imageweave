@@ -33,6 +33,8 @@ func macOSBuildFlags(cmd *cobra.Command, o *macosbuild.Options) {
 	cmd.Flags().
 		StringVar(&o.Workspace, "workspace", "auto", "Automatic storage selection or an absolute pinned workspace")
 	cmd.Flags().
+		BoolVar(&o.SharedMediaCache, "shared-media-cache", false, "Keep verified IPSWs beside job workspaces for reuse across attempts")
+	cmd.Flags().
 		StringVar(&o.ScratchRoot, "scratch-root", "", "Native host scratch directory (default user cache)")
 	cmd.Flags().
 		StringVar(&o.Repository, "repository", ".", "Imageweave checkout containing the Go builders and Packer templates")

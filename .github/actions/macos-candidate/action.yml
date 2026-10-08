@@ -55,6 +55,6 @@ runs:
         set -euo pipefail
         # The same entry point runs locally. No hosted-only provisioning path.
         caffeinate -is go run ./cmd/build-macos --workspace "$WORK" \
-          --scratch-root "$MACOS_SCRATCH" --release "$RELEASE" --revision "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --tier base --packer "$WORK/bootstrap/packer" \
+          --shared-media-cache --scratch-root "$MACOS_SCRATCH" --release "$RELEASE" --revision "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --tier base --packer "$WORK/bootstrap/packer" \
           > "$WORK/results.json" 2> >(tee "$WORK/build.log" >&2)
         jq -e 'length == 1 and .[0].tier == "base" and .[0].reused == false' "$WORK/results.json"

@@ -42,21 +42,24 @@ type Budget struct {
 // Three copies remain per accepted image (Packer, imported bundle, OCI). One
 // additional copy is live during clone acceptance or registry read-back. Clones
 // are already unpacked and removed sequentially by the acceptance library.
+// Media is an upper bound, added only for bytes still to download at that stage;
+// existing media has already reduced measured free space.
 func MacOS(images int) (Budget, error) {
 	if images < 1 || images > 6 {
 		return Budget{}, fmt.Errorf("image count must be between one and six")
 	}
 	b := Budget{Images: images, Media: 40 * GiB, Disk: 80 * GiB, Host: 4 * GiB, Reserve: 8 * GiB}
-	b.Image = uint64(images)*(3*b.Disk+b.Media) + b.Disk
+	b.Image = uint64(images)*3*b.Disk + b.Disk
 	return b, nil
 }
 
 type Plan struct {
-	Inventory Inventory `json:"inventory"`
-	Budget    Budget    `json:"budget"`
-	Workspace string    `json:"workspace,omitempty"`
-	Scratch   string    `json:"scratch,omitempty"`
-	Serial    bool      `json:"sequential"`
+	Inventory  Inventory `json:"inventory"`
+	Budget     Budget    `json:"budget"`
+	Workspace  string    `json:"workspace,omitempty"`
+	Scratch    string    `json:"scratch,omitempty"`
+	MediaCache string    `json:"mediaCache,omitempty"`
+	Serial     bool      `json:"sequential"`
 }
 
 func native(v Volume) bool { return v.Filesystem == "apfs" || v.Filesystem == "hfs" }

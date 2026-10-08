@@ -194,3 +194,70 @@ func TestSharedScratchSerializesWorkspaces(t *testing.T) {
 		t.Fatal("lock not released after failure:", err)
 	}
 }
+
+func TestStageCapacityDoesNotReserveDownloadedMediaAgain(t *testing.T) {
+	o := options(t)
+	o.Tier = "base"
+	o.ScratchRoot = t.TempDir()
+	o.SharedMediaCache = true
+	free := uint64(367)*buildstorage.GiB + buildstorage.GiB/2
+	inventory := func(context.Context, string, string) (buildstorage.Inventory, error) {
+		return buildstorage.Inventory{
+			Host: buildstorage.Volume{
+				Root:       o.ScratchRoot,
+				Filesystem: "apfs",
+				Pools:      []string{"host"},
+			},
+			Volumes: []buildstorage.Volume{
+				{Root: o.Workspace, Filesystem: "apfs", Pools: []string{"images"}},
+			},
+			Pools: map[string]uint64{"host": 20 * buildstorage.GiB, "images": free},
+		}, nil
+	}
+	// This exact capacity failed after the successful 26,637,307,067-byte transfer.
+	p, err := planStorageStage(t.Context(), o, nil, 0, inventory)
+	must(t, err)
+	if p.Budget.Image != 320*buildstorage.GiB ||
+		p.MediaCache != filepath.Join(filepath.Dir(o.Workspace), "media") {
+		t.Fatal(p)
+	}
+	remaining := uint64(26637307067)
+	free = 328*buildstorage.GiB + remaining - 1
+	if _, err = planStorageStage(
+		t.Context(),
+		o,
+		nil,
+		remaining,
+		inventory,
+	); !errors.Is(
+		err,
+		buildstorage.ErrCapacity,
+	) {
+		t.Fatal("download admitted without remaining capacity", err)
+	}
+	if _, err = planStorageStage(t.Context(), o, nil, 41*buildstorage.GiB, inventory); err == nil {
+		t.Fatal("oversized media admitted")
+	}
+}
+
+func TestAutomaticWorkflowEnablesSharedCache(t *testing.T) {
+	o := options(t)
+	o.Workspace = "auto"
+	chosen := t.TempDir()
+	scratch := t.TempDir()
+	_, err := storedWorkflow(
+		t.Context(),
+		o,
+		nil,
+		func(context.Context, Options, io.Writer) (buildstorage.Plan, error) {
+			return buildstorage.Plan{Workspace: chosen, Scratch: scratch}, nil
+		},
+		func(_ context.Context, selected Options, _ io.Writer) ([]Result, error) {
+			if !selected.SharedMediaCache || selected.Workspace != chosen {
+				t.Fatal(selected)
+			}
+			return nil, nil
+		},
+	)
+	must(t, err)
+}

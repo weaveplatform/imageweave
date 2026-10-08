@@ -13,8 +13,9 @@ import (
 
 type storagePlanner func(context.Context, Options, io.Writer) (buildstorage.Plan, error)
 
-// PlanStorage runs without downloading media or creating VM disks. The restore
-// media allowance is an explicit upper bound checked again before downloading.
+// PlanStorage checks construction capacity without downloading media or creating
+// disks. Source size is resolved later; downloads reserve only their remaining
+// bytes before transferring, rather than charging already cached bytes again.
 func PlanStorage(ctx context.Context, o Options, log io.Writer) (buildstorage.Plan, error) {
 	return planStorage(ctx, o, log, buildstorage.Discover)
 }
@@ -23,6 +24,12 @@ func planStorage(
 	ctx context.Context,
 	o Options,
 	log io.Writer,
+	discover func(context.Context, string, string) (buildstorage.Inventory, error),
+) (buildstorage.Plan, error) {
+	return planStorageStage(ctx, o, log, 0, discover)
+}
+
+func planStorageStage(ctx context.Context, o Options, log io.Writer, remaining uint64,
 	discover func(context.Context, string, string) (buildstorage.Inventory, error),
 ) (buildstorage.Plan, error) {
 	releases, err := selections(o)
@@ -47,11 +54,25 @@ func planStorage(
 	if err != nil {
 		return buildstorage.Plan{}, err
 	}
+	if remaining > budget.Media {
+		return buildstorage.Plan{}, fmt.Errorf("restore media exceeds storage budget")
+	}
+	budget.Image += remaining
 	inventory, err := discover(ctx, o.ScratchRoot, o.Workspace)
 	if err != nil {
 		return buildstorage.Plan{}, err
 	}
 	result, err := buildstorage.Select(inventory, budget, o.Workspace)
+	if err == nil {
+		if o.Workspace == "auto" || o.SharedMediaCache {
+			result.MediaCache = filepath.Join(result.Workspace, "media")
+		} else {
+			result.MediaCache = filepath.Join(o.Workspace, "media")
+		}
+		if o.Workspace != "auto" && o.SharedMediaCache {
+			result.MediaCache = filepath.Join(filepath.Dir(o.Workspace), "media")
+		}
+	}
 	if err == nil && o.Workspace == "auto" {
 		key := o.Release + "-" + o.Tier
 		if o.Revision != "" {
@@ -87,6 +108,9 @@ func storedWorkflow(
 	if err != nil {
 		return nil, err
 	}
+	if o.Workspace == "auto" {
+		o.SharedMediaCache = true
+	}
 	o.Workspace, o.ScratchRoot = storage.Workspace, storage.Scratch
 	if err = os.MkdirAll(o.ScratchRoot, 0o700); err != nil {
 		return nil, fmt.Errorf("create host scratch: %w", err)
@@ -99,11 +123,10 @@ func storedWorkflow(
 	return build(ctx, o, log)
 }
 
-func checkBuildStorage(ctx context.Context, o Options, log io.Writer) error {
-	// Already-existing artifacts consume actual free space. Reserve one more
-	// image's peak before starting each new restore/preparation, never all clones
-	// concurrently. Explicit workspace remains fixed throughout this invocation.
+func checkBuildStorage(ctx context.Context, o Options, remaining uint64, log io.Writer) error {
+	// Free space already excludes cached media and completed artifacts. Add only
+	// the bytes this stage will allocate; construction never reserves media again.
 	o.Release, o.Tier = "n", "base"
-	_, err := PlanStorage(ctx, o, log)
+	_, err := planStorageStage(ctx, o, log, remaining, buildstorage.Discover)
 	return err
 }
