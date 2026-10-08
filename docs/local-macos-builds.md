@@ -147,13 +147,16 @@ registration token and `--runnergroup imageweave-macos --labels imageweave-macos
 Configure an absolute existing `WEAVE_IMAGE_WORKSPACE` in the runner's local
 `.env`; host storage paths and credentials must never be committed. Keep the
 runner application and checkout on the host filesystem, and put large image
-outputs on the configured image volume. Go compiler/linker scratch must remain
-on the native host filesystem: the workflow sets `GOTMPDIR` under `RUNNER_TEMP`
-while retaining image/OCI scratch under the image workspace. During live testing,
-Go 1.27.0 produced a zero-filled executable when its temporary linker output was
-on ExFAT; the same command passed with host-local `GOTMPDIR`. For local commands,
-leave Go temporary storage at its host default or set `GOTMPDIR` to an existing
-host-local directory if overriding `TMPDIR` to external storage.
+outputs on the configured image volume. Go compiler/linker scratch and Packer
+plugin sockets must remain on the native host filesystem: the workflow sets
+`TMPDIR` to `RUNNER_TEMP` and `GOTMPDIR` beneath it during construction. During
+live testing, Go 1.27.0 produced a zero-filled executable when its temporary linker
+output was on ExFAT, and Unix socket creation failed with operation-not-supported.
+Use a short host-local temporary path so Packer sockets fit the macOS Unix socket
+path limit. For local commands, retain the host defaults for `TMPDIR` and
+`GOTMPDIR`. Large image outputs are explicitly placed under the image workspace;
+the workflow scopes external `TMPDIR` to OCI publication and registry verification
+commands, whose temporary read-back layouts also need image-volume capacity.
 Ensure `jq`, Git, Go prerequisites and
 Apple's command-line tools are accessible to the service. The workflow installs
 checksum-pinned Packer and the Go version from `go.mod`.
