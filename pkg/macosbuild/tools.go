@@ -41,6 +41,8 @@ func prepareTools(ctx context.Context, o Options, log io.Writer) (tools, error) 
 		cmd.Env = append(
 			os.Environ(),
 			"GOWORK=off",
+			"TMPDIR="+o.ScratchRoot,
+			"GOTMPDIR="+o.ScratchRoot,
 			"GOBIN="+toolsDir,
 			"PACKER_PLUGIN_PATH="+filepath.Join(toolsDir, "plugins"),
 		)

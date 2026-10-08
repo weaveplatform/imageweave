@@ -19,6 +19,7 @@ import (
 
 	common "github.com/weaveplatform/imageweave/internal/imagebuild"
 	"github.com/weaveplatform/imageweave/internal/imagebuild/macos"
+	"github.com/weaveplatform/imageweave/pkg/buildstorage"
 	"github.com/weaveplatform/imageweave/pkg/catalog"
 	"github.com/weaveplatform/imageweave/pkg/delivery"
 	"github.com/weaveplatform/imageweave/pkg/plan"
@@ -32,7 +33,7 @@ var ErrBuild = errors.New("macOS build workflow")
 // downloads, artifacts and reports; repository files contain no lab paths.
 type Options struct {
 	Workspace, Repository, Release, Tier, Packer, OCI string
-	Timeout, Revision                                 string
+	Timeout, Revision, ScratchRoot                    string
 }
 
 type Result struct {
@@ -61,7 +62,15 @@ type tools struct {
 // A successful existing artifact is deeply checked and its evidence rechecked
 // before reuse. An incomplete directory is preserved and reported as an error.
 func Run(ctx context.Context, o Options, log io.Writer) ([]Result, error) {
-	return workflow(ctx, o, log, prepareTools, productionServices)
+	return storedWorkflow(
+		ctx,
+		o,
+		log,
+		PlanStorage,
+		func(ctx context.Context, o Options, log io.Writer) ([]Result, error) {
+			return workflow(ctx, o, log, prepareTools, productionServices)
+		},
+	)
 }
 
 func workflow(
@@ -90,9 +99,17 @@ func workflow(
 
 func productionServices(o Options, installed tools, log io.Writer) services {
 	return services{
-		sources:  func(ctx context.Context, r string) ([]macos.AppleSource, error) { return macos.MacSources(ctx, nil, r) },
-		download: (common.Downloader{Log: log}).Download,
+		sources: func(ctx context.Context, r string) ([]macos.AppleSource, error) { return macos.MacSources(ctx, nil, r) },
+		download: func(ctx context.Context, media common.Media, path string) (string, error) {
+			if err := checkBuildStorage(ctx, o, log); err != nil {
+				return "", err
+			}
+			return (common.Downloader{Log: log}).Download(ctx, media, path)
+		},
 		build: func(ctx context.Context, opts delivery.Options) (delivery.Construction, error) {
+			if err := checkBuildStorage(ctx, o, log); err != nil {
+				return delivery.Construction{}, err
+			}
 			return delivery.BuildNative(ctx, opts, installed.runner, log)
 		},
 		inspect: func(ctx context.Context, path, ref string) (report conformance.Report, err error) {
@@ -131,7 +148,7 @@ func selections(o Options) ([]string, error) {
 			ErrBuild,
 		)
 	}
-	if !filepath.IsAbs(o.Workspace) || filepath.Clean(o.Workspace) != o.Workspace ||
+	if (o.Workspace != "auto" && (!filepath.IsAbs(o.Workspace) || filepath.Clean(o.Workspace) != o.Workspace)) ||
 		o.Repository == "" ||
 		o.Packer == "" ||
 		(o.Tier != "base" && o.Tier != "prepared" && o.Tier != "all") {
@@ -282,6 +299,12 @@ func buildTier(
 	api services,
 	log io.Writer,
 ) (Result, conformance.Report, error) {
+	if source.Size > int64(40*buildstorage.GiB) {
+		return Result{}, conformance.Report{}, fmt.Errorf(
+			"%w: Apple media exceeds the 40 GiB storage budget; update the estimate before building",
+			ErrBuild,
+		)
+	}
 	tag := source.Version + "-" + source.Build + "-" + tier + "-" + installed.commit[:12]
 	if o.Revision != "" {
 		tag += "-r" + o.Revision

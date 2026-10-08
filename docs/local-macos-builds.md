@@ -9,7 +9,7 @@ build process.
 From a clean, committed Imageweave checkout:
 
 ```console
-GOWORK=off go run ./cmd/build-macos --workspace /absolute/path/to/images --release 26 --tier all
+GOWORK=off go run ./cmd/build-macos --workspace auto --release 26 --tier all
 ```
 
 This builds a pristine base and a prepared image for macOS 26. Use `--release all`
@@ -25,9 +25,9 @@ Prerequisites:
 - Go 1.27, Git, Apple's `codesign`, and Packer **1.16.0** on `PATH`.
   `--packer /absolute/path/to/packer` selects an alternate installation.
 - Network access for Go dependencies, source discovery and Apple restore media.
-- An absolute workspace on storage with capacity for downloaded IPSWs, restored
-  disks, OCI data and two unpacked acceptance clones per artifact. The base disk
-  is 80 GiB logical size; actual usage depends on sparse-file support and content.
+- Mounted writable APFS/HFS+ storage with enough capacity for the requested job.
+  The driver discovers local and external volumes automatically. Unmounted disks
+  are not mounted or formatted by the builder.
 
 The driver builds the Imageweave worker and native Packer plugin from the current
 commit, signs both with the virtualization entitlement, installs the plugin into
@@ -36,6 +36,57 @@ the workspace, and builds `weaveoci` at the version pinned by `go.mod`.
 `--repository /absolute/path/to/imageweave` selects the checkout used for tools
 and templates. Uncommitted changes are rejected so image provenance names the
 recipe that actually ran.
+
+## Storage planning and sequential execution
+
+`--workspace auto` is the default. The Go planner inventories mounted local and
+external volumes, probes writability, measures available space, and chooses the
+compatible image workspace with the most free space. APFS volumes in the same
+container share one capacity pool. Mounted sparse disk images are also limited
+by the available space on their backing filesystem, including nested images.
+Unwritable or incompatible volumes are reported and excluded.
+
+To inspect the plan without downloading media or creating disks:
+
+```console
+GOWORK=off go run ./cmd/imageweave plan-macos-storage --release 26 --tier base
+```
+
+The plan returns JSON on stdout and progress/errors on stderr. Insufficient space
+returns a nonzero exit code before tool installation, downloads or VM creation.
+Capacity is checked again before each download and construction. This is a
+preflight check, not a reservation against unrelated processes consuming space.
+
+Sizing uses the 80 GiB logical disk size without assuming compression or sparse
+allocation savings. Each retained image budgets three copies (Packer output,
+imported bundle and OCI), plus 40 GiB restore media. One additional 80 GiB copy
+covers sequential clone acceptance or publication read-back. A base-only job
+therefore requires 360 GiB image capacity, plus an 8 GiB free-space reserve.
+Host tool scratch requires 4 GiB plus the reserve; shared pools add both demands
+and count the reserve once. Oversized restore media is rejected before download.
+This deliberately conservative bound can exceed the eventual physical usage.
+
+Local multi-image runs retain their outputs, so the estimate includes all of
+them: `--release all --tier all` budgets six images, or 1760 GiB plus reserve.
+The publishing workflow builds, accepts, publishes and removes each successful
+job's workspace before beginning the next image. Failed and build-only outputs
+are retained. No pre-existing images are deleted to make room.
+
+`--workspace /absolute/path` pins storage instead of selecting it automatically.
+Use a pinned workspace to reliably reuse source locks and outputs: automatic
+selection can choose a different volume when available capacity changes.
+`--scratch-root /short/native/path` selects tool scratch; its default is the
+user cache's `imageweave/scratch` directory. Scratch must remain on APFS/HFS+ for
+Go linker output and Packer Unix sockets. Keep its path short enough for macOS
+Unix sockets. Concurrent commands sharing a scratch root are rejected by an
+exclusive build lock, even when their image workspaces differ. Normal exit and
+errors release it; after a hard kill, inspect running builders before removing
+`scratch-root/imageweave-build/build.lock`.
+
+Releases, tiers and acceptance clones execute sequentially. Both candidate
+workflows use `max-parallel: 1` and a fixed concurrency group across refs. The
+macOS workflow preserves its storage plan as an artifact even when preflight
+fails, then stops the remaining matrix when a job fails.
 
 ## What completes successfully
 
@@ -144,19 +195,15 @@ any source checkout, in a path without spaces (for example,
 `go version` invocation when the runner was under `Application Support`.
 Register it at organization scope using GitHub's short-lived
 registration token and `--runnergroup imageweave-macos --labels imageweave-macos`.
-Configure an absolute existing `WEAVE_IMAGE_WORKSPACE` in the runner's local
-`.env`; host storage paths and credentials must never be committed. Keep the
-runner application and checkout on the host filesystem, and put large image
-outputs on the configured image volume. Go compiler/linker scratch and Packer
-plugin sockets must remain on the native host filesystem: the workflow sets
-`TMPDIR` to `RUNNER_TEMP` and `GOTMPDIR` beneath it during construction. During
-live testing, Go 1.27.0 produced a zero-filled executable when its temporary linker
-output was on ExFAT, and Unix socket creation failed with operation-not-supported.
-Use a short host-local temporary path so Packer sockets fit the macOS Unix socket
-path limit. For local commands, retain the host defaults for `TMPDIR` and
-`GOTMPDIR`. Large image outputs are explicitly placed under the image workspace;
-the workflow scopes external `TMPDIR` to OCI publication and registry verification
-commands, whose temporary read-back layouts also need image-volume capacity.
+No fixed image-volume environment variable is needed. The workflow runs the Go
+storage planner and puts the job on the selected volume. Keep the runner
+application and checkout on the host filesystem. `TMPDIR` and `GOTMPDIR` use
+`RUNNER_TEMP` during construction. Live tests found Go 1.27.0 producing zero-filled
+linker output on ExFAT, which also rejects Packer's Unix sockets. Image outputs
+use the selected APFS/HFS+ workspace; publication and registry verification use
+its temporary directory for their large read-back layouts. For local `go run`,
+retain native host defaults for the initial compiler's `TMPDIR` and `GOTMPDIR`;
+the Go driver applies the selected scratch root to all child build processes.
 Ensure `jq`, Git, Go prerequisites and
 Apple's command-line tools are accessible to the service. The workflow installs
 checksum-pinned Packer and the Go version from `go.mod`.

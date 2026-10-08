@@ -57,7 +57,7 @@ Run from this repository, with Go 1.27:
 
 For ad-hoc macOS base and prepared builds, use the standalone Go workflow:
 
-    GOWORK=off go run ./cmd/build-macos --workspace /absolute/path/to/images --release 26 --tier all
+    GOWORK=off go run ./cmd/build-macos --workspace auto --release 26 --tier all
 
 See [local macOS builds](docs/local-macos-builds.md) for prerequisites, repeat-run
 behaviour, output contracts and current live-validation limits.
@@ -68,7 +68,7 @@ See [scenarios](docs/scenarios.md) for the matrix, [architecture](docs/architect
 for ownership, [research](docs/research/release-baseline.md) for primary sources,
 and the [QEMU template](templates/qemu/README.md) for construction.
 [examples/linux.yaml](examples/linux.yaml) describes the required inputs.
-Choose an absolute workspace path on storage with enough capacity for source
+The macOS Go driver selects compatible storage automatically and checks capacity for source
 media, sparse build disks, caches and acceptance outputs. Paths are supplied by
 the build request; the project does not assume a particular disk or mount.
 
