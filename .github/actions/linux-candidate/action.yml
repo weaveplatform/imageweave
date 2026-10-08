@@ -34,6 +34,31 @@ runs:
         printf '%s  %s\n' "$checksum" "$WORK/packer.zip" | sha256sum -c -
         unzip "$WORK/packer.zip" packer -d "$WORK/tools"
         echo "$WORK/tools" >> "$GITHUB_PATH"
+        {
+          uname -srmo
+          qemu-system-aarch64 --version
+          qemu-system-x86_64 --version
+          "$WORK/tools/packer" version
+        } | tee "$WORK/build-tools.txt"
+        # Record QEMU's non-secret machine/device arguments without enabling
+        # Packer's verbose SSH logging. Resolve the actual executable before
+        # installing wrappers earlier on PATH.
+        for binary in qemu-system-aarch64 qemu-system-x86_64; do
+          real_binary=$(command -v "$binary")
+          {
+            printf '#!/bin/bash\nset -euo pipefail\n'
+            printf 'real_binary=%q\n' "$real_binary"
+            cat <<'WRAPPER'
+        {
+          printf '[%s] %q ' "$(date -u +%FT%TZ)" "$real_binary"
+          printf '%q ' "$@"
+          printf '\n'
+        } >> "$WORK/qemu-commands.log"
+        exec "$real_binary" "$@"
+        WRAPPER
+          } > "$WORK/tools/$binary"
+          chmod +x "$WORK/tools/$binary"
+        done
     - name: Compile recipe and OCI tools from exact commits
       shell: bash
       run: |
@@ -54,6 +79,12 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        jq '{family,release,arch,sourceBuild,sourceSHA256,accelerator,firmwareCode,firmwareVars}' "$WORK/request.json"
+        # Follow before Packer creates its workspace; retain the file even when
+        # Packer deletes its failed candidate. Never enable secret-bearing debug logs.
+        tail --lines=+1 --follow=name --retry "$WORK/delivery/packer/serial.log" 2>/dev/null &
+        serial_pid=$!
+        trap 'kill "$serial_pid" 2>/dev/null || true; wait "$serial_pid" 2>/dev/null || true' EXIT
         imageweave delivery --request "$WORK/request.json" --recipe-commit "$GITHUB_SHA" \
           --source-uri "$(jq -er .sourceURI "$WORK/metadata.json")" \
           --version "$(jq -er .tag "$WORK/metadata.json")" --out "$WORK/delivery" \
