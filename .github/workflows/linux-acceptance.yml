@@ -1,0 +1,90 @@
+name: images | Linux acceptance (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  GOWORK: 'off'
+  OCI_COMMIT: 5f8bebbcdf6f3e6534b8ccf79e592512791bc01c
+
+jobs:
+  select:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select every requested catalog row without hiding missing pins
+        id: matrix
+        env:
+          FAMILY: ubuntu
+          RELEASE: n
+          ARCH: arm64
+        run: |
+          set -euo pipefail
+          matrix=$(jq -c --arg family "$FAMILY" --arg release "$RELEASE" --arg arch "$ARCH" \
+            '{include:[.families[] | select(.id == "ubuntu" or .id == "fedora") | select($family == "all" or .id == $family) | .id as $f | .releases[] | select($release == "all" or .slot == $release) | .version as $v | .architectures[] | select($arch == "all" or .arch == $arch) | {family:$f,release:$v,arch:.arch,runner:(if .arch == "arm64" then "ubuntu-24.04-arm" else "ubuntu-24.04" end)}]}' pkg/catalog/releases.json)
+          jq -e '.include | length > 0' <<< "$matrix" >/dev/null
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  acceptance:
+    needs: select
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    env:
+      FAMILY: ${{ matrix.family }}
+      RELEASE: ${{ matrix.release }}
+      ARCH: ${{ matrix.arch }}
+      SOURCE_SERIAL: ''
+      CANDIDATE_REVISION: '1'
+    steps:
+      - uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Packer build and exact OCI runtime acceptance with coverage
+        uses: ./.github/actions/linux-candidate
+      - name: Delete ephemeral build SSH credentials
+        if: always()
+        run: rm -f "$WORK/build-key" "$WORK/build-key.pub"
+      - name: Upload acceptance coverage
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cover-accept-${{ matrix.family }}-${{ matrix.release }}-${{ matrix.arch }}
+          path: ${{ env.WORK }}/coverage
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve diagnostics and exact acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-${{ matrix.family }}-${{ matrix.release }}-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ env.WORK }}/tool-commits.txt
+            ${{ env.WORK }}/source.json
+            ${{ env.WORK }}/request.json
+            ${{ env.WORK }}/metadata.json
+            ${{ env.WORK }}/firmware-packages.txt
+            ${{ env.WORK }}/delivery.json
+            ${{ env.WORK }}/delivery/packer/manifest.json
+            ${{ env.WORK }}/delivery/bundle/imageweave-import.json
+            ${{ env.WORK }}/delivery/validated/acceptance.json
+            ${{ env.WORK }}/delivery/validated/inspection.json
+            ${{ env.WORK }}/delivery/validated/reports

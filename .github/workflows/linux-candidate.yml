@@ -1,20 +1,6 @@
 name: images | Imageweave Linux candidate
 
 on:
-  pull_request:
-    paths:
-      - 'pkg/delivery/**'
-      - 'pkg/plan/**'
-      - 'pkg/catalog/**'
-      - 'go.mod'
-      - 'go.sum'
-      - 'internal/cli/delivery*'
-      - 'internal/imagebuild/**'
-      - 'templates/qemu/**'
-      - 'provision/linux/**'
-      - 'scripts/delivery/**'
-      - 'delivery/**'
-      - '.github/workflows/linux-candidate.yml'
   schedule:
     - cron: '41 5 * * 1'
   workflow_dispatch:
@@ -112,52 +98,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: weaveplatform/weaveplatform-oci
-          ref: 5f8bebbcdf6f3e6534b8ccf79e592512791bc01c
-          path: .oci-tool
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - name: Install build tools and checksum-pinned Packer
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-system-arm qemu-utils ovmf qemu-efi-aarch64 cloud-image-utils genisoimage xorriso jq unzip
-          if [ -e /dev/kvm ]; then sudo chmod a+rw /dev/kvm; fi
-          WORK="$RUNNER_TEMP/imageweave"
-          echo "WORK=$WORK" >> "$GITHUB_ENV"
-          mkdir -p "$WORK/tools"
-          case "$ARCH" in
-            amd64) checksum=5edcd14ab59b535040c512dbecd6ec9ef976a000b073c19d93e4c431c948581e ;;
-            arm64) checksum=cf18f03460d92265d49b56befff333e80641d845822799eab04357c39f75b5d7 ;;
-            *) exit 2 ;;
-          esac
-          curl -fsSL "https://releases.hashicorp.com/packer/1.16.0/packer_1.16.0_linux_$ARCH.zip" -o "$WORK/packer.zip"
-          printf '%s  %s\n' "$checksum" "$WORK/packer.zip" | sha256sum -c -
-          unzip "$WORK/packer.zip" packer -d "$WORK/tools"
-          echo "$WORK/tools" >> "$GITHUB_PATH"
-      - name: Compile recipe and OCI tools from exact commits
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git -C .oci-tool rev-parse HEAD)" = "$OCI_COMMIT"
-          go build -trimpath -o "$WORK/tools/imageweave" ./cmd/imageweave
-          (cd .oci-tool && go build -trimpath -o "$WORK/tools/weaveoci" ./cmd/weaveoci)
-          echo "WEAVEOCI=$WORK/tools/weaveoci" >> "$GITHUB_ENV"
-          printf 'imageweave=%s\nweaveplatform-oci=%s\n' "$GITHUB_SHA" "$OCI_COMMIT" > "$WORK/tool-commits.txt"
-      - name: Authenticate source and pin source and firmware bytes
-        run: scripts/delivery/prepare-linux.sh "$FAMILY" "$RELEASE" "$ARCH" "$WORK"
-      - name: Packer build, OCI import, exact-artifact two-clone reboot acceptance
-        run: |
-          set -euo pipefail
-          imageweave delivery --request "$WORK/request.json" --recipe-commit "$GITHUB_SHA" \
-            --source-uri "$(jq -er .sourceURI "$WORK/metadata.json")" \
-            --version "$(jq -er .tag "$WORK/metadata.json")" --out "$WORK/delivery" \
-            > "$WORK/delivery.json"
-          jq -e '.schemaVersion == 3 and .passed == true' "$WORK/delivery/validated/acceptance.json"
+      - name: Build and accept candidate with coverage
+        uses: ./.github/actions/linux-candidate
       - name: Log in to GHCR
         if: inputs.publish
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
