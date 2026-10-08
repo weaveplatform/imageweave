@@ -158,7 +158,7 @@ func TestIPSWDownloadAndResume(t *testing.T) {
 }
 
 func TestIPSWFailurePaths(t *testing.T) {
-	for _, mode := range []string{"size", "oversized", "hash", "cancelled", "parent file", "cache file", "cache symlink", "capacity reused", "capacity fresh", "adopt mkdir", "adopt link", "partial metadata", "partial mismatch", "partial oversized", "partial directory", "partial stat", "fetch failed"} {
+	for _, mode := range []string{"size", "oversized", "hash", "cancelled", "parent file", "cache file", "cache loop", "cache symlink", "capacity reused", "capacity fresh", "adopt mkdir", "adopt link", "partial metadata", "partial mismatch", "partial oversized", "partial directory", "partial stat", "fetch failed"} {
 		t.Run(mode, func(t *testing.T) {
 			root := t.TempDir()
 			o := options(t)
@@ -183,6 +183,11 @@ func TestIPSWFailurePaths(t *testing.T) {
 				o.Workspace = filepath.Join(root, "file", "job")
 			case "cache file":
 				cacheFile(t, ipswCache(o), nil)
+			case "cache loop":
+				if runtime.GOOS == "windows" {
+					t.Skip("symlink permissions")
+				}
+				must(t, os.Symlink(ipswCache(o), ipswCache(o)))
 			case "cache symlink":
 				if runtime.GOOS == "windows" {
 					t.Skip("symlink permissions")

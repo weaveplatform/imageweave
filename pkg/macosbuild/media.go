@@ -25,8 +25,8 @@ func ipswCache(o Options) string {
 // adopts already downloaded IPSWs without duplicating their multi-gigabyte data.
 func ipswCandidates(workspace, cache string) ([]string, error) {
 	dirs := []string{cache, filepath.Join(workspace, "media")}
-	entries, err := os.ReadDir(filepath.Dir(workspace))
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	entries, err := mediaEntries(filepath.Dir(workspace))
+	if err != nil {
 		return nil, err
 	}
 	for _, entry := range entries {
@@ -41,10 +41,7 @@ func ipswCandidates(workspace, cache string) ([]string, error) {
 			continue
 		}
 		seen[dir] = true
-		entries, err = os.ReadDir(dir)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
+		entries, err = mediaEntries(dir)
 		if err != nil {
 			return nil, err
 		}
@@ -55,6 +52,22 @@ func ipswCandidates(workspace, cache string) ([]string, error) {
 		}
 	}
 	return candidates, nil
+}
+
+// Windows ReadDir can classify a regular-file path as "not found". Check the
+// directory itself first so a cache misconfiguration never triggers a transfer.
+func mediaEntries(dir string) ([]os.DirEntry, error) {
+	info, err := os.Stat(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("IPSW cache path is not a directory: %s", dir)
+	}
+	return os.ReadDir(dir)
 }
 
 func downloadIPSW(ctx context.Context, o Options, media common.Media, log io.Writer,
