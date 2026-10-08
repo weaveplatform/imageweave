@@ -72,7 +72,7 @@ build:
 		done; \
 	done
 
-## gate: everything CI runs, in order
+## gate: local Go quality checks (CI also requires Packer validation and live Linux acceptance)
 gate: vet lint test cover vuln build
 
 .PHONY: help init fmt lint vet test cover vuln build gate
@@ -94,3 +94,10 @@ accept-native:
 	$(GO) test -count=1 -timeout 3h -v ./test/acceptance
 
 .PHONY: native-plugin accept-native
+
+## image-builder: build transitional image scenario and runtime acceptance commands
+image-builder:
+	@mkdir -p $(BIN_DIR)
+	$(GO) build -o $(BIN_DIR)/imageweave ./cmd/imageweave
+
+.PHONY: image-builder

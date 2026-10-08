@@ -12,7 +12,7 @@ API does not supply an Intel macOS backend. macOS 27 amd64 is vendor-unsupported
 
 Use an Apple silicon Mac with virtualization support, a host-supported Apple
 IPSW and enough free APFS storage for an 80 GiB sparse disk plus restore media.
-For this test setup use /Volumes/KING/weave-images/work/imageweave/.
+Choose an absolute workspace path on a suitable local or mounted volume.
 
 1. Authenticate and cache the IPSW; pin its SHA256 and Apple build identifier.
 2. Create a fresh workspace parent and fill

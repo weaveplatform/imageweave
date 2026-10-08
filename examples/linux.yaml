@@ -8,13 +8,13 @@ target: qemu
 sourceURL: https://example.invalid/pinned-vendor-build/ubuntu-arm64.img
 sourceSHA256: REPLACE_WITH_AUTHENTICATED_SHA256
 sourceBuild: REPLACE_WITH_VENDOR_BUILD_ID
-workspace: /Volumes/KING/weave-images/imageweave/ubuntu-arm64
-sshPrivateKey: /Volumes/KING/weave-images/imageweave/keys/build
-sshPublicKey: /Volumes/KING/weave-images/imageweave/keys/build.pub
+workspace: /path/to/imageweave/ubuntu-arm64
+sshPrivateKey: /path/to/imageweave/keys/build
+sshPublicKey: /path/to/imageweave/keys/build.pub
 firmwareCode:
-  path: /Volumes/KING/weave-images/imageweave/firmware/code.fd
+  path: /path/to/imageweave/firmware/code.fd
   sha256: REPLACE_WITH_CODE_SHA256
 firmwareVars:
-  path: /Volumes/KING/weave-images/imageweave/firmware/vars.fd
+  path: /path/to/imageweave/firmware/vars.fd
   sha256: REPLACE_WITH_VARS_SHA256
 accelerator: hvf

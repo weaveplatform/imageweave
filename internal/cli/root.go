@@ -62,7 +62,8 @@ func New(out, errOut io.Writer) *cobra.Command {
 	if err := p.MarkFlagRequired("request"); err != nil {
 		panic(err)
 	}
-	root.AddCommand(p)
+	root.AddCommand(p, newImage(out, errOut))
+	addDeliveryCommand(root)
 	return root
 }
 

@@ -36,9 +36,8 @@ The planner rechecked the cached source checksum. This run reused the
 existing detached-signature verification record; it did not fetch and
 authenticate a new vendor checksum manifest.
 
-All build and validation artifacts are retained locally under:
-
-    /Volumes/KING/weave-images/work/imageweave/ubuntu-26.04-arm64-foundation/
+Build and validation artifacts were retained in the local validation workspace.
+They are not publicly hosted evidence. Paths below are relative to that workspace.
 
 The candidate is `candidate/disk.raw`; input firmware, resolved plan and
 Packer manifest are alongside it. Build EFI variable state was excluded

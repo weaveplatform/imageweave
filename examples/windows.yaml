@@ -8,9 +8,9 @@ edition: enterprise
 language: en-US
 # The ISO must contain the selected edition and efisys_noprompt.bin.
 # Use an absolute path on the Windows builder's image-storage volume.
-sourceURL: 'K:\weave-images\media\windows-11.iso'
+sourceURL: 'D:\imageweave\media\windows-11.iso'
 sourceSHA256: REPLACE_WITH_AUTHENTICATED_SHA256
 # Exact build including update revision, checked against the installed registry.
 sourceBuild: REPLACE_WITH_FULL_WINDOWS_BUILD
-workspace: 'K:\weave-images\work\imageweave\windows-build'
+workspace: 'D:\imageweave\builds\windows'
 timeout: 2h

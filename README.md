@@ -33,14 +33,18 @@ do not advance these stable/general-purpose tracks.
 - A native Packer plugin for Windows HCS installation/Sysprep and Apple IPSW restore.
 - Explicit source checksums, firmware checksums and per-build SSH keys.
 - A build result contract that does not confuse construction with acceptance.
-- Unit tests and a 95% Go coverage gate; Packer validation is a separate check.
+- A Packer-to-OCI delivery command with exact-artifact Linux qualification and an explicitly gated publication workflow.
+- OS-specific construction and qualification packages; see [platform boundaries](docs/platform-packages.md).
+- Migrated source acquisition, package locks, Windows fallback and agent/desktop preparation commands under `imageweave image`.
+- Unit tests and a 95% Go coverage gate; Packer and live VM validation are separate checks.
 
 Native templates: [Windows](templates/windows/README.md) and
 [macOS](templates/macos/README.md). The [native design record](docs/research/native-packer-builders.md)
 explains library reuse and output compatibility. [Native validation evidence](docs/native-validation-checkpoint.md)
 records the checks and remaining host requirements. Cloud provider templates,
-agent/desktop variants, the complete acceptance contract and automated
-OCI/Hostweave handoff remain integration work.
+Packer conversion of migrated agent/desktop scenarios, native runtime observation
+adapters and Hostweave consumption remain integration work. Migrating an existing
+command does not qualify a release/architecture combination.
 Ubuntu 26.04 arm64 has passed a real Packer build followed by OCI pack/unpack
 and two independent clone boots; see the [validation checkpoint](docs/validation-checkpoint.md).
 
@@ -51,16 +55,26 @@ Run from this repository, with Go 1.27:
     go run ./cmd/imageweave matrix
     go run ./cmd/imageweave plan --request build.yaml
 
+See the [delivery validation checkpoint](docs/delivery-validation-checkpoint.md) for the four-boot Linux evidence.
+
 See [scenarios](docs/scenarios.md) for the matrix, [architecture](docs/architecture.md)
 for ownership, [research](docs/research/release-baseline.md) for primary sources,
 and the [QEMU template](templates/qemu/README.md) for construction.
 [examples/linux.yaml](examples/linux.yaml) describes the required inputs.
-All local image work belongs under /Volumes/KING/weave-images/ for this test setup.
+Choose an absolute workspace path on storage with enough capacity for source
+media, sparse build disks, caches and acceptance outputs. Paths are supplied by
+the build request; the project does not assume a particular disk or mount.
 
 ## Quality
 
     make gate
     make packer-check
+
+`make gate` runs the local Go checks; `make packer-check` validates the templates.
+CI additionally requires a real Ubuntu N arm64 Packer build, OCI import and
+acceptance of two independent clones, including reboot checks. The required
+quality gate merges this acceptance coverage with the unit coverage before
+applying the 95% total and per-package thresholds.
 
 Go statement coverage does not certify template bootability. A candidate remains
 unverified until two independent deployments of its final artifact pass the

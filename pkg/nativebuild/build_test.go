@@ -17,7 +17,7 @@ import (
 
 	"howett.net/plist"
 
-	"github.com/weaveplatform/imageweave/internal/disk/vhd"
+	"github.com/weaveplatform/weaveplatform-oci/pkg/disk/vhd"
 )
 
 func fixture(t *testing.T, family string) Config {

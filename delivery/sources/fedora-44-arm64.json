@@ -1,0 +1,8 @@
+{
+  "sourceURL": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-44-1.7.aarch64.qcow2",
+  "sourceSHA256": "55c60a3b80d3616a08705afd0459e75fe9f03c54aba7a46e4002a41a72fa0d5b",
+  "sourceBuild": "44-1.7",
+  "checksumsURL": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/aarch64/images/Fedora-Cloud-44-1.7-aarch64-CHECKSUM",
+  "fingerprint": "36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6",
+  "keyring": "delivery/keys/fedora-44.asc"
+}

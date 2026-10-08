@@ -17,7 +17,7 @@ import (
 	hcs "github.com/deploymenttheory/go-bindings-win32/bindings/win32/system/hostcomputesystem"
 	"golang.org/x/sys/windows"
 
-	"github.com/weaveplatform/imageweave/internal/disk/virtualdisk"
+	windowsdisk "github.com/weaveplatform/imageweave/internal/disk/hosts/windows"
 )
 
 func installWindowsNative(
@@ -40,11 +40,11 @@ func installWindowsNative(
 	progress := newNativeProgress(ctx, r.Log, "export windows/"+r.Arch)
 	finish := progress.start()
 	progress.step("flattening stopped VHDX into raw OCI export bridge")
-	err = virtualdisk.Convert(
+	err = windowsdisk.Convert(
 		ctx,
 		filepath.Join(r.Directory, "disk.vhdx"),
 		filepath.Join(r.Directory, "disk.vhd"),
-		virtualdisk.FixedVHD,
+		windowsdisk.FixedVHD,
 	)
 	finish(err)
 	return result, err
@@ -106,7 +106,7 @@ func windowsNativeAPI(api hcsSystemCalls) windowsNativeCalls {
 }
 
 func createWindowsDisk(path string) error {
-	return virtualdisk.Create(context.Background(), path, 80<<30)
+	return windowsdisk.Create(context.Background(), path, 80<<30)
 }
 
 func connectWindowsSerial(
