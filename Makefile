@@ -94,3 +94,10 @@ accept-native:
 	$(GO) test -count=1 -timeout 3h -v ./test/acceptance
 
 .PHONY: native-plugin accept-native
+
+## image-builder: build transitional image scenario and runtime acceptance commands
+image-builder:
+	@mkdir -p $(BIN_DIR)
+	$(GO) build -o $(BIN_DIR)/imageweave ./cmd/imageweave
+
+.PHONY: image-builder

@@ -81,6 +81,11 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Validate transitional package lock and workspace helper
+        run: |
+          go run ./cmd/imageweave image check-lock
+          shellcheck scripts/images/workspace.sh
+
       # The linter version lives in a plain file so the deps refresh job can
       # move it without the workflows permission a workflow edit would need.
       - name: Linter version
