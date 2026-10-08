@@ -37,7 +37,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: linux-candidate-${{ github.ref }}-${{ inputs.family }}-${{ inputs.release }}-${{ inputs.arch }}
+  group: linux-candidate
   cancel-in-progress: false
 
 env:
@@ -88,7 +88,7 @@ jobs:
     needs: select
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 1
       matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 150
@@ -142,7 +142,7 @@ jobs:
     needs: select
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 1
       matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 150

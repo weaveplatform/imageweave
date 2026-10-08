@@ -65,7 +65,7 @@ jobs:
     if: ${{ !inputs.publish }}
     needs: select
     strategy:
-      fail-fast: false
+      fail-fast: true
       max-parallel: 1
       matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     runs-on:
@@ -84,6 +84,14 @@ jobs:
           persist-credentials: false
       - name: Build and accept candidate
         uses: ./.github/actions/macos-candidate
+      - name: Preserve storage preflight
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: storage-macos-${{ matrix.release }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/macos-storage.json
+          retention-days: 14
+          if-no-files-found: warn
       - name: Preserve diagnostics and acceptance evidence
         if: always() && env.WORK != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -92,6 +100,7 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
           path: |
+            ${{ env.WORK }}/storage-plan.json
             ${{ env.WORK }}/tool-versions.txt
             ${{ env.WORK }}/build.log
             ${{ env.WORK }}/results.json
@@ -104,7 +113,7 @@ jobs:
     if: inputs.publish && github.ref == 'refs/heads/main' && github.event.repository.visibility == 'public'
     needs: select
     strategy:
-      fail-fast: false
+      fail-fast: true
       max-parallel: 1
       matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     runs-on:
@@ -143,6 +152,14 @@ jobs:
           weaveoci profile validate --profiles "$WORK/profiles.json"
       - name: Publish and verify base candidate
         uses: ./.github/actions/publish-macos-candidate
+      - name: Preserve storage preflight
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: storage-macos-${{ matrix.release }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/macos-storage.json
+          retention-days: 14
+          if-no-files-found: warn
       - name: Preserve diagnostics and acceptance evidence
         if: always() && env.WORK != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -151,6 +168,7 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
           path: |
+            ${{ env.WORK }}/storage-plan.json
             ${{ env.WORK }}/tool-versions.txt
             ${{ env.WORK }}/build.log
             ${{ env.WORK }}/results.json
@@ -168,9 +186,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Only this job's mktemp workspace is removed, after registry read-back
+          # Only this job's planned workspace is removed, after registry read-back
           # and the evidence upload succeed. Failed builds remain for diagnosis.
-          case "$WORK" in
-            "$WEAVE_IMAGE_WORKSPACE"/macos-"$GITHUB_RUN_ID"-"$GITHUB_RUN_ATTEMPT"-"$RELEASE".*) rm -rf -- "$WORK" ;;
-            *) echo 'Refusing unexpected workspace path' >&2; exit 1 ;;
-          esac
+          selected=$(jq -er .workspace "$RUNNER_TEMP/macos-storage.json")
+          [ "$WORK" = "$selected" ] && [ "${WORK##*/}" = "$RELEASE-base-r$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" ] && [ -f "$WORK/storage-plan.json" ] || {
+            echo 'Refusing unexpected workspace path' >&2; exit 1
+          }
+          rm -rf -- "$WORK"
