@@ -71,7 +71,7 @@ runs:
           printf '%q ' "$@"
           printf '\n'
         } >> "$WORK/qemu-commands.log"
-        exec "$real_binary" "$@"
+        exec "$real_binary" "$@" 2> >(tee -a "$WORK/qemu-stderr.log" >&2)
         WRAPPER
           } > "$WORK/tools/$binary"
           chmod +x "$WORK/tools/$binary"

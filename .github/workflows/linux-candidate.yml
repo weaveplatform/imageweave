@@ -177,6 +177,7 @@ jobs:
             ${{ env.WORK }}/tool-commits.txt
             ${{ env.WORK }}/build-tools.txt
             ${{ env.WORK }}/qemu-commands.log
+            ${{ env.WORK }}/qemu-stderr.log
             ${{ env.WORK }}/source.json
             ${{ env.WORK }}/request.json
             ${{ env.WORK }}/metadata.json

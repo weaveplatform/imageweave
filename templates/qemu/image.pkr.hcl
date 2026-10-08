@@ -50,6 +50,12 @@ variable "accelerator" {
   }
 }
 
+locals {
+  # QEMU plugin 1.1.7 adds a virtio MMIO controller for virtio-scsi CDs.
+  # ARM virt provides that bus; x86 q35 uses its built-in IDE/SATA controller.
+  cdrom_interface = var.arch == "arm64" ? "virtio-scsi" : "ide"
+}
+
 source "qemu" "guest" {
   iso_url         = var.source_url
   iso_checksum    = "sha256:${var.source_sha256}"
@@ -58,7 +64,7 @@ source "qemu" "guest" {
   disk_size       = "24G"
   disk_interface  = "virtio"
   net_device      = "virtio-net"
-  cdrom_interface = "virtio-scsi"
+  cdrom_interface = local.cdrom_interface
   qemu_binary     = var.arch == "arm64" ? "qemu-system-aarch64" : "qemu-system-x86_64"
   machine_type    = var.arch == "arm64" ? "virt" : "q35"
   cpu_model       = var.accelerator == "tcg" ? "max" : "host"

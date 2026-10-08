@@ -45,12 +45,27 @@ This hardware choice follows the 2026-10-08 investigation: the hosted Ubuntu
 A local reproduction using the same source bytes, Ubuntu 24.04 AAVMF firmware,
 QEMU 8.2 and the pinned Packer plugin completed the build under TCG in 11 minutes
 35 seconds, with guest uptime around 489 seconds when SSH became available. This
-shows the template can complete under TCG, but does not establish the hosted
-failure's root cause or qualify that runner.
-Hosted ARM/TCG remains unqualified pending its diagnostic run. The workflows now
-stream and retain guest serial output, QEMU argument vectors and tool versions.
+shows the template can complete under TCG, but does not qualify the hosted runner.
+
+The [hosted ARM diagnostic run](https://github.com/weaveplatform/imageweave/actions/runs/37736041417/job/113175736590)
+was cancelled after its serial log had captured a guest boot failure: the kernel
+enumerated `vda1`, `vda13` and `vda15`, but systemd's 90-second waits for
+`/dev/disk/by-label/BOOT` and `/dev/disk/by-label/UEFI` expired. The `/boot`,
+`/boot/efi` and local-filesystem dependencies failed, and the guest entered an
+emergency shell instead of becoming available over SSH. The cause of the missing
+device-label readiness is still unresolved; the evidence does not prove a TCG
+performance fault. Hosted ARM/TCG remains unqualified pending diagnosis and a
+successful full acceptance run. The workflows stream and retain guest serial
+output, QEMU argument vectors and tool versions.
 GitHub does not guarantee nested virtualization, so the gate verifies KVM rather
 than inferring it from a runner label. See the [GitHub runner documentation](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners#cloud-hosts-used-by-github-hosted-runners).
+
+The amd64 KVM run also exposed a separate, reproducible template defect: the
+pinned QEMU plugin's `virtio-scsi` CD path adds a `virtio-scsi-device` controller
+that cannot attach on `q35` (QEMU reports that its virtio bus is full). The seed
+CD now uses the built-in IDE/SATA controller on amd64 and retains virtio SCSI on
+ARM. The all-row Packer check evaluates this bus selection, and workflow artifacts
+retain QEMU stderr as well as its argument vector. See the [pinned plugin implementation](https://github.com/hashicorp/packer-plugin-qemu/blob/v1.1.7/builder/qemu/step_run.go#L266-L278).
 
 The standalone candidate workflow retains its Ubuntu N arm64 default and weekly
 run; dispatch can select any or all of the twelve reviewed Linux rows. Both
