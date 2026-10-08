@@ -71,10 +71,13 @@ the build request; the project does not assume a particular disk or mount.
     make packer-check
 
 `make gate` runs the local Go checks; `make packer-check` validates the templates.
-CI additionally requires a real Ubuntu N arm64 Packer build, OCI import and
-acceptance of two independent clones, including reboot checks. The required
-quality gate merges this acceptance coverage with the unit coverage before
-applying the 95% total and per-package thresholds.
+CI additionally requires a real Ubuntu N amd64 Packer build on verified KVM,
+OCI import and acceptance of two independent clones, including reboot checks.
+The gate fails if KVM is unavailable; it does not fall back to software emulation.
+The required quality gate merges this acceptance coverage with the unit coverage
+before applying the 95% total and per-package thresholds. The standalone candidate
+workflow retains arm64 coverage; hosted ARM/TCG qualification remains pending.
+See the [delivery notes](delivery/README.md) for the hardware choice and evidence.
 
 Go statement coverage does not certify template bootability. A candidate remains
 unverified until two independent deployments of its final artifact pass the

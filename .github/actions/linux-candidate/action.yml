@@ -1,7 +1,8 @@
 name: Build and accept Linux candidate
 description: Shared Packer to OCI to two-clone acceptance path; never publishes
 # Callers set FAMILY, RELEASE, ARCH, SOURCE_SERIAL, CANDIDATE_REVISION and
-# OCI_COMMIT. WORK, PATH and GOCOVERDIR are exported for subsequent steps.
+# OCI_COMMIT; the required gate also sets REQUIRED_ACCELERATOR=kvm.
+# WORK, PATH and GOCOVERDIR are exported for subsequent steps.
 runs:
   using: composite
   steps:
@@ -25,6 +26,22 @@ runs:
         WORK="$RUNNER_TEMP/imageweave"
         echo "WORK=$WORK" >> "$GITHUB_ENV"
         mkdir -p "$WORK/tools"
+        if [ "${REQUIRED_ACCELERATOR:-}" = kvm ]; then
+          [ "$ARCH" = amd64 ] && [ -r /dev/kvm ] && [ -w /dev/kvm ] || {
+            echo 'Required acceptance needs an amd64 runner with accessible KVM' >&2
+            exit 1
+          }
+          # A device node alone is insufficient. A successful monitor quit
+          # confirms QEMU completed KVM initialization before accepting input.
+          if ! printf 'quit\n' | timeout 10s qemu-system-x86_64 \
+            -machine q35,accel=kvm -cpu host -display none -monitor stdio \
+            -serial none -nodefaults -S > "$WORK/kvm-probe.log" 2>&1; then
+            cat "$WORK/kvm-probe.log" >&2
+            echo 'KVM startup probe failed; TCG fallback is forbidden in the required gate' >&2
+            exit 1
+          fi
+          echo 'Required acceptance: QEMU KVM startup verified'
+        fi
         case "$ARCH" in
           amd64) checksum=5edcd14ab59b535040c512dbecd6ec9ef976a000b073c19d93e4c431c948581e ;;
           arm64) checksum=cf18f03460d92265d49b56befff333e80641d845822799eab04357c39f75b5d7 ;;
@@ -34,6 +51,31 @@ runs:
         printf '%s  %s\n' "$checksum" "$WORK/packer.zip" | sha256sum -c -
         unzip "$WORK/packer.zip" packer -d "$WORK/tools"
         echo "$WORK/tools" >> "$GITHUB_PATH"
+        {
+          uname -srmo
+          qemu-system-aarch64 --version
+          qemu-system-x86_64 --version
+          "$WORK/tools/packer" version
+        } | tee "$WORK/build-tools.txt"
+        # Record QEMU's non-secret machine/device arguments without enabling
+        # Packer's verbose SSH logging. Resolve the actual executable before
+        # installing wrappers earlier on PATH.
+        for binary in qemu-system-aarch64 qemu-system-x86_64; do
+          real_binary=$(command -v "$binary")
+          {
+            printf '#!/bin/bash\nset -euo pipefail\n'
+            printf 'real_binary=%q\n' "$real_binary"
+            cat <<'WRAPPER'
+        {
+          printf '[%s] %q ' "$(date -u +%FT%TZ)" "$real_binary"
+          printf '%q ' "$@"
+          printf '\n'
+        } >> "$WORK/qemu-commands.log"
+        exec "$real_binary" "$@" 2> >(tee -a "$WORK/qemu-stderr.log" >&2)
+        WRAPPER
+          } > "$WORK/tools/$binary"
+          chmod +x "$WORK/tools/$binary"
+        done
     - name: Compile recipe and OCI tools from exact commits
       shell: bash
       run: |
@@ -49,11 +91,25 @@ runs:
         printf 'imageweave=%s\nweaveplatform-oci=%s\n' "$GITHUB_SHA" "$OCI_COMMIT" > "$WORK/tool-commits.txt"
     - name: Authenticate source and pin source and firmware bytes
       shell: bash
-      run: scripts/delivery/prepare-linux.sh "$FAMILY" "$RELEASE" "$ARCH" "$WORK"
+      run: |
+        set -euo pipefail
+        scripts/delivery/prepare-linux.sh "$FAMILY" "$RELEASE" "$ARCH" "$WORK"
+        if [ -n "${REQUIRED_ACCELERATOR:-}" ]; then
+          jq -e --arg required "$REQUIRED_ACCELERATOR" '.accelerator == $required' "$WORK/request.json" >/dev/null || {
+            echo "Resolved build accelerator does not match required $REQUIRED_ACCELERATOR" >&2
+            exit 1
+          }
+        fi
     - name: Packer build, OCI import, exact-artifact two-clone reboot acceptance
       shell: bash
       run: |
         set -euo pipefail
+        jq '{family,release,arch,sourceBuild,sourceSHA256,accelerator,firmwareCode,firmwareVars}' "$WORK/request.json"
+        # Follow before Packer creates its workspace; retain the file even when
+        # Packer deletes its failed candidate. Never enable secret-bearing debug logs.
+        tail --lines=+1 --follow=name --retry "$WORK/delivery/packer/serial.log" 2>/dev/null &
+        serial_pid=$!
+        trap 'kill "$serial_pid" 2>/dev/null || true; wait "$serial_pid" 2>/dev/null || true' EXIT
         imageweave delivery --request "$WORK/request.json" --recipe-commit "$GITHUB_SHA" \
           --source-uri "$(jq -er .sourceURI "$WORK/metadata.json")" \
           --version "$(jq -er .tag "$WORK/metadata.json")" --out "$WORK/delivery" \

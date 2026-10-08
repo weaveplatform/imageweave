@@ -175,12 +175,16 @@ jobs:
           if-no-files-found: warn
           path: |
             ${{ env.WORK }}/tool-commits.txt
+            ${{ env.WORK }}/build-tools.txt
+            ${{ env.WORK }}/qemu-commands.log
+            ${{ env.WORK }}/qemu-stderr.log
             ${{ env.WORK }}/source.json
             ${{ env.WORK }}/request.json
             ${{ env.WORK }}/metadata.json
             ${{ env.WORK }}/firmware-packages.txt
             ${{ env.WORK }}/delivery.json
             ${{ env.WORK }}/delivery/packer/manifest.json
+            ${{ env.WORK }}/delivery/packer/serial.log
             ${{ env.WORK }}/delivery/bundle/imageweave-import.json
             ${{ env.WORK }}/delivery/validated/acceptance.json
             ${{ env.WORK }}/delivery/validated/inspection.json
