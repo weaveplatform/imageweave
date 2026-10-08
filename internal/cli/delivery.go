@@ -11,10 +11,18 @@ import (
 )
 
 func addDeliveryCommand(root *cobra.Command) {
-	root.AddCommand(newDeliveryCommand(delivery.Exec))
+	root.AddCommand(newDeliveryCommand(delivery.Exec), newNativeDeliveryCommand(delivery.Exec))
 }
 
 func newDeliveryCommand(run delivery.Runner) *cobra.Command {
+	return deliveryCommand(run, false)
+}
+
+func newNativeDeliveryCommand(run delivery.Runner) *cobra.Command {
+	return deliveryCommand(run, true)
+}
+
+func deliveryCommand(run delivery.Runner, native bool) *cobra.Command {
 	var options delivery.Options
 	var request string
 	command := &cobra.Command{
@@ -30,6 +38,13 @@ func newDeliveryCommand(run delivery.Runner) *cobra.Command {
 			options.Request, err = plan.Decode(f)
 			if err != nil {
 				return fmt.Errorf("decode delivery request: %w", err)
+			}
+			if native {
+				result, err := delivery.BuildNative(cmd.Context(), options, run, cmd.ErrOrStderr())
+				if err != nil {
+					return fmt.Errorf("construct native delivery: %w", err)
+				}
+				return writeJSON(cmd.OutOrStdout(), result)
 			}
 			result, err := delivery.Build(cmd.Context(), options, run, cmd.ErrOrStderr())
 			if err != nil {
@@ -52,7 +67,12 @@ func newDeliveryCommand(run delivery.Runner) *cobra.Command {
 		StringVar(&options.Packer, "packer", "packer", "Packer binary")
 	command.Flags().
 		StringVar(&options.OCI, "weaveoci", "weaveoci", "OCI binary built from pinned repository commit")
-	command.Flags().
-		StringVar(&options.Imageweave, "imageweave", "imageweave", "Imageweave binary for runtime acceptance")
+	if native {
+		command.Use = "delivery-native"
+		command.Short = "Construct and package an unqualified Windows or macOS OCI candidate"
+	} else {
+		command.Flags().
+			StringVar(&options.Imageweave, "imageweave", "imageweave", "Imageweave binary for runtime acceptance")
+	}
 	return command
 }

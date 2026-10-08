@@ -36,8 +36,10 @@ and media must be selected before implementing the Windows installer template.
 
 A scenario records purpose, destination/runtime, OS release/build/edition,
 architecture, firmware, software lock, first boot, management transport,
-output representation and acceptance profile. Current executable plans allow
-guest-base/qemu for Linux only; other combinations fail with a reason.
+output representation and acceptance profile. Executable base plans support guest-base/qemu for Linux, guest-base/hcs for
+Windows and guest-base/apple-vz for supported macOS rows. Other combinations
+fail with a reason. Construction and runtime qualification remain separate;
+see the [delivery evidence](../delivery/README.md) for exact qualified artifacts.
 
 Cloud targets (AWS, Azure, GCP) and private clouds have separate profiles.
 An OS/architecture pair in this catalog is not a claim of support on every cloud.
