@@ -54,7 +54,7 @@ type fakeQEMU struct {
 	bootCounts            map[string]int
 }
 
-func (f *fakeQEMU) run(_ context.Context, w, _ io.Writer, name string, args ...string) error {
+func (f *fakeQEMU) run(ctx context.Context, w, _ io.Writer, name string, args ...string) error {
 	if name == f.fail {
 		return errors.New("native tool failed")
 	}
@@ -77,6 +77,16 @@ func (f *fakeQEMU) run(_ context.Context, w, _ io.Writer, name string, args ...s
 			f.t.Fatal("NoCloud seed lacks marker")
 		}
 	case "qemu-system-aarch64", "qemu-system-x86_64":
+		// Native boots necessarily consume measurable time. An immediate fake
+		// can finish within one Windows clock tick, producing zero-duration
+		// evidence that the schema-3 gate correctly rejects.
+		started := time.Now()
+		if err := waitFakeBootTick(
+			ctx,
+			func() time.Duration { return time.Since(started) },
+		); err != nil {
+			return err
+		}
 		f.boots++
 		disk := ""
 		for _, arg := range args {
@@ -116,6 +126,55 @@ func (f *fakeQEMU) run(_ context.Context, w, _ io.Writer, name string, args ...s
 		f.t.Fatalf("unexpected native tool %s %v", name, args)
 	}
 	return nil
+}
+
+func waitFakeBootTick(ctx context.Context, elapsed func() time.Duration) error {
+	for elapsed() <= 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Millisecond):
+		}
+	}
+	return nil
+}
+
+func mustAcceptCandidate(t *testing.T, err error, out string) {
+	t.Helper()
+	if err != nil {
+		report, readErr := os.ReadFile(filepath.Join(out, "acceptance.json"))
+		t.Fatalf("%v; acceptance report (read error: %v):\n%s", err, readErr, report)
+	}
+}
+
+func TestFakeBootWaitsForObservedClockTick(t *testing.T) {
+	for _, zeroTicks := range []int{0, 3} {
+		t.Run(fmt.Sprint(zeroTicks), func(t *testing.T) {
+			observations := 0
+			err := waitFakeBootTick(t.Context(), func() time.Duration {
+				observations++
+				if observations <= zeroTicks {
+					return 0
+				}
+				return time.Nanosecond
+			})
+			must(t, err)
+			if observations != zeroTicks+1 {
+				t.Fatalf("clock observations=%d", observations)
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := waitFakeBootTick(
+		ctx,
+		func() time.Duration { return 0 },
+	); !errors.Is(
+		err,
+		context.Canceled,
+	) {
+		t.Fatalf("stalled fake clock ignored cancellation: %v", err)
+	}
 }
 
 func TestBootLinuxDisposableState(t *testing.T) {
@@ -216,7 +275,7 @@ func TestValidateLinuxPackedBytesAndFreshIdentities(t *testing.T) {
 					t.Fatal("cloned identity accepted")
 				}
 			} else {
-				must(t, err)
+				mustAcceptCandidate(t, err, out)
 				if !result.Passed || result.SchemaVersion != 3 || fake.boots != 4 ||
 					!strings.HasPrefix(result.PlatformDigests["linux/arm64"], "sha256:") ||
 					!strings.HasPrefix(result.IndexDigest, "sha256:") {
@@ -342,7 +401,7 @@ func TestAgentCandidatePreservesParentManifest(t *testing.T) {
 			Timeout: time.Second,
 		},
 	)
-	must(t, err)
+	mustAcceptCandidate(t, err, base)
 	l, cache := packageFixture(t)
 	p := Packages{
 		Tools: Tools{
@@ -482,7 +541,7 @@ func TestLinuxAgentFailureBoundaries(t *testing.T) {
 			Timeout: time.Second,
 		},
 	)
-	must(t, err)
+	mustAcceptCandidate(t, err, base)
 	for _, mode := range []string{"platform", "evidence", "recipe-output", "bundle-output", "git", "bundle-metadata"} {
 		t.Run(mode, func(t *testing.T) {
 			l, cache := packageFixture(t)
