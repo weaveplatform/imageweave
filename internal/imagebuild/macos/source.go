@@ -188,3 +188,6 @@ func compareVersionNumbers(a, b string) int {
 	x, y := parse(a), parse(b)
 	return slices.Compare(x[:], y[:])
 }
+
+// Validate checks a pinned restore record without changing its selected version.
+func (s AppleSource) Validate(version string) error { _, err := s.validate(version, 1); return err }
