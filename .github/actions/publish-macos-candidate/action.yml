@@ -1,0 +1,52 @@
+name: Publish and verify macOS candidate
+description: Publish one accepted index, attest it and verify it against the macOS policy
+runs:
+  using: composite
+  steps:
+    - name: Publish accepted index
+      id: publish
+      shell: bash
+      env:
+        TIER: base
+      run: |
+        set -euo pipefail
+        result=$(jq -ce --arg tier "$TIER" '[.[] | select(.tier == $tier)] | if length == 1 then .[0] else error("expected one accepted image") end' "$WORK/results.json")
+        tag=$(jq -er .version <<< "$result")
+        digest=$(jq -er .digest <<< "$result")
+        layout=$(jq -er .layout <<< "$result")
+        acceptance=$(jq -er .acceptance <<< "$result")
+        repository="macos-$RELEASE-$TIER"
+        jq -e --arg digest "$digest" --arg tag "$tag" '.schemaVersion == 3 and .passed == true and .indexDigest == $digest and .tag == $tag' "$acceptance" >/dev/null
+        weaveoci publish --layout "$layout" --layout-ref "$tag" --expected-digest "$digest" \
+          --acceptance "$acceptance" --repository "$repository" --tag "$tag" \
+          --promotion-out "$WORK/$TIER-promotion.json"
+        {
+          echo "digest=$digest"
+          echo "name=ghcr.io/weaveplatform/weave-images/$repository"
+          echo "acceptance=$acceptance"
+        } >> "$GITHUB_OUTPUT"
+    - name: Attest build provenance
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+      with:
+        subject-name: ${{ steps.publish.outputs.name }}
+        subject-digest: ${{ steps.publish.outputs.digest }}
+        push-to-registry: true
+        create-storage-record: false
+    - name: Attest acceptance
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+      with:
+        subject-name: ${{ steps.publish.outputs.name }}
+        subject-digest: ${{ steps.publish.outputs.digest }}
+        predicate-type: https://weaveplatform.io/attestations/image-acceptance/v1
+        predicate-path: ${{ steps.publish.outputs.acceptance }}
+        push-to-registry: true
+        create-storage-record: false
+    - name: Verify published candidate
+      shell: bash
+      env:
+        TIER: base
+      run: |
+        set -euo pipefail
+        weaveoci image verify-candidate "$WORK/$TIER-promotion.json" \
+          --policy delivery/macos-candidate-policy.json --out "$WORK/$TIER-published-audit" \
+          > "$WORK/$TIER-verification.json"

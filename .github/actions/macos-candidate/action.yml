@@ -1,0 +1,53 @@
+name: Build and accept macOS base candidate
+description: Run the standalone Go build and two-clone acceptance on Apple Silicon
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: false
+    - name: Prepare native workspace
+      shell: bash
+      run: |
+        set -euo pipefail
+        [ "$(uname -sm)" = 'Darwin arm64' ]
+        [ "$(git rev-parse HEAD)" = "$GITHUB_SHA" ]
+        case "${WEAVE_IMAGE_WORKSPACE:-}" in
+          /*) test -d "$WEAVE_IMAGE_WORKSPACE" ;;
+          *) echo 'Configure an absolute WEAVE_IMAGE_WORKSPACE on the runner' >&2; exit 1 ;;
+        esac
+        command -v jq
+        command -v codesign
+        WORK=$(mktemp -d "$WEAVE_IMAGE_WORKSPACE/macos-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RELEASE.XXXXXX")
+        mkdir "$WORK/bootstrap" "$WORK/tmp" "$WORK/docker"
+        {
+          echo "WORK=$WORK"
+          echo "TMPDIR=$WORK/tmp"
+          echo "DOCKER_CONFIG=$WORK/docker"
+        } >> "$GITHUB_ENV"
+        echo "$WORK/tools" >> "$GITHUB_PATH"
+    - name: Install checksum-pinned Packer
+      shell: bash
+      run: |
+        set -euo pipefail
+        curl -fsSL https://releases.hashicorp.com/packer/1.16.0/packer_1.16.0_darwin_arm64.zip -o "$WORK/bootstrap/packer.zip"
+        printf '%s  %s\n' 6530042cf8f8a1f96b6607cb22b5be298be53b400cd4a2c81ab8b946964fccda "$WORK/bootstrap/packer.zip" | shasum -a 256 -c -
+        unzip "$WORK/bootstrap/packer.zip" packer -d "$WORK/bootstrap"
+        {
+          printf 'imageweave=%s\n' "$GITHUB_SHA"
+          go list -m github.com/weaveplatform/weaveplatform-oci
+          go version
+          "$WORK/bootstrap/packer" version
+          sw_vers
+        } > "$WORK/tool-versions.txt"
+    - name: Build and accept base image
+      shell: bash
+      run: |
+        set -euo pipefail
+        # The same entry point runs locally. No hosted-only provisioning path.
+        caffeinate -is go run ./cmd/build-macos --workspace "$WORK" \
+          --release "$RELEASE" --revision "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --tier base --packer "$WORK/bootstrap/packer" \
+          > "$WORK/results.json" 2> >(tee "$WORK/build.log" >&2)
+        jq -e 'length == 1 and .[0].tier == "base" and .[0].reused == false' "$WORK/results.json"
