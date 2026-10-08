@@ -31,7 +31,7 @@ func TestBudget(t *testing.T) {
 	}
 	one, _ := MacOS(1)
 	all, _ := MacOS(6)
-	if one.Image != 360*GiB || all.Image != 1760*GiB || one.Host != 4*GiB || one.Reserve != 8*GiB {
+	if one.Image != 320*GiB || all.Image != 1520*GiB || one.Host != 4*GiB || one.Reserve != 8*GiB {
 		t.Fatal(one, all)
 	}
 }

@@ -34,6 +34,7 @@ var ErrBuild = errors.New("macOS build workflow")
 type Options struct {
 	Workspace, Repository, Release, Tier, Packer, OCI string
 	Timeout, Revision, ScratchRoot                    string
+	SharedMediaCache                                  bool
 }
 
 type Result struct {
@@ -100,14 +101,18 @@ func workflow(
 func productionServices(o Options, installed tools, log io.Writer) services {
 	return services{
 		sources: func(ctx context.Context, r string) ([]macos.AppleSource, error) { return macos.MacSources(ctx, nil, r) },
-		download: func(ctx context.Context, media common.Media, path string) (string, error) {
-			if err := checkBuildStorage(ctx, o, log); err != nil {
-				return "", err
-			}
-			return (common.Downloader{Log: log}).Download(ctx, media, path)
+		download: func(ctx context.Context, media common.Media, _ string) (string, error) {
+			return downloadIPSW(
+				ctx,
+				o,
+				media,
+				log,
+				checkBuildStorage,
+				(common.Downloader{Log: log}).Download,
+			)
 		},
 		build: func(ctx context.Context, opts delivery.Options) (delivery.Construction, error) {
-			if err := checkBuildStorage(ctx, o, log); err != nil {
+			if err := checkBuildStorage(ctx, o, 0, log); err != nil {
 				return delivery.Construction{}, err
 			}
 			return delivery.BuildNative(ctx, opts, installed.runner, log)
