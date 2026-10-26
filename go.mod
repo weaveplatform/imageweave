@@ -8,14 +8,14 @@ tool (
 )
 
 require (
-	github.com/Microsoft/go-winio v0.6.3
+	github.com/Microsoft/go-winio v0.6.4
 	github.com/deploymenttheory/go-bindings-macosplatform v0.20.1
 	github.com/deploymenttheory/go-bindings-win32 v0.5.0
 	github.com/deploymenttheory/go-sdk-winmediafoundry v0.8.0
-	github.com/go-chi/chi/v5 v5.3.2
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/hcl/v2 v2.25.0
-	github.com/hashicorp/packer-plugin-sdk v0.6.12
+	github.com/hashicorp/packer-plugin-sdk v0.6.13
 	github.com/mitchellh/go-vnc v0.0.0-20150629162542-723ed9867aed
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
@@ -29,7 +29,7 @@ require (
 	golang.org/x/sys v0.49.0
 	gopkg.in/yaml.v3 v3.0.1
 	howett.net/plist v1.0.1
-	oras.land/oras-go/v2 v2.6.2
+	oras.land/oras-go/v2 v2.6.4
 )
 
 require (
@@ -105,7 +105,7 @@ require (
 	github.com/hashicorp/consul/api v1.34.5 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-getter/v2 v2.2.5 // indirect
+	github.com/hashicorp/go-getter/v2 v2.2.6 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-metrics v0.7.0 // indirect
