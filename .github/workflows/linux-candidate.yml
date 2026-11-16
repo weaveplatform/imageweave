@@ -102,7 +102,7 @@ jobs:
       SOURCE_SERIAL: ${{ inputs.serial }}
       CANDIDATE_REVISION: ${{ inputs.revision || '1' }}
     steps:
-      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -159,7 +159,7 @@ jobs:
       SOURCE_SERIAL: ${{ inputs.serial }}
       CANDIDATE_REVISION: ${{ inputs.revision || '1' }}
     steps:
-      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -182,7 +182,7 @@ jobs:
           (cd .oci-delivery && go build -trimpath -o "$WORK/tools/weaveoci-delivery" ./cmd/weaveoci)
           printf 'publication-tools=%s\n' "$delivery_commit" >> "$WORK/tool-commits.txt"
       - name: Log in to GHCR
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
